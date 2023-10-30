@@ -334,7 +334,7 @@ static void TX_task(void *pvParameters)
 void rs485_start()
 {
     xTaskCreate(RX_task, "RX_task", RX_TASK_STACK_SIZE * 2, NULL, RX_TASK_PRIO, NULL);
-    xTaskCreate(TX_task, "TX_task", 4096 * 2, NULL, 31, NULL);
+    xTaskCreate(TX_task, "TX_task", 4096 * 2, NULL, 3, NULL);
 }
 
 /****************************************************************************/
