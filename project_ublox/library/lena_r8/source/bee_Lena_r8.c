@@ -126,7 +126,8 @@ static void lena_vPublish_data_sensor()
 static void lena_vPublish_data_rs485()
 {
     // Create AT command to publish json message rs485
-    char *message_json_rs485 = pack_3pha_data();
+    char *message_json_rs485 = (char *)calloc(800, sizeof(char));
+    message_json_rs485 = pack_3pha_data();
 
     snprintf(message_publish, BEE_LENGTH_AT_COMMAND, "AT+UMQTTC=9,0,0,%s,%d\r\n", BEE_TOPIC_PUBLISH, strlen(message_json_rs485) + 1);
     snprintf(message_publish_content_for_publish_mqtt_binary_rs485, BEE_LENGTH_AT_COMMAND_RS485, "%s\r\n", message_json_rs485);
