@@ -1,0 +1,26 @@
+{
+    "project_name":       "bootloader",
+    "project_path":       "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/bootloader/subproject",
+    "build_dir":          "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/examples/get-started/project_ublox/build/bootloader",
+    "config_file":        "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/examples/get-started/project_ublox/sdkconfig",
+    "config_defaults":    "",
+    "bootloader_elf":     "",
+    "app_elf":            "bootloader.elf",
+    "app_bin":            "bootloader.bin",
+    "build_type":         "flash_app",
+    "git_revision":       "HEAD-HASH-NOTFOUND",
+    "target":             "esp32",
+    "rev":                "0",
+    "min_rev":            "0",
+    "max_rev":            "399",
+    "phy_data_partition": "",
+    "monitor_baud" :      "115200",
+    "monitor_toolprefix": "xtensa-esp32-elf-",
+    "config_environment" : {
+        "COMPONENT_KCONFIGS" : "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/efuse/Kconfig;D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/esp_common/Kconfig;D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/esp_hw_support/Kconfig;D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/esp_system/Kconfig;D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/freertos/Kconfig;D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/hal/Kconfig;D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/log/Kconfig;D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/newlib/Kconfig;D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/soc/Kconfig;D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/spi_flash/Kconfig",
+        "COMPONENT_KCONFIGS_PROJBUILD" : "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/bootloader/Kconfig.projbuild;D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/esp_app_format/Kconfig.projbuild;D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/esp_rom/Kconfig.projbuild;D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/esptool_py/Kconfig.projbuild;D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/partition_table/Kconfig.projbuild"
+    },
+    "build_components" : [ "bootloader", "bootloader_support", "efuse", "esp_app_format", "esp_common", "esp_hw_support", "esp_rom", "esp_system", "esptool_py", "freertos", "hal", "log", "main", "micro-ecc", "newlib", "partition_table", "soc", "spi_flash", "xtensa", "" ],
+    "build_component_paths" : [ "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/bootloader", "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/bootloader_support", "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/efuse", "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/esp_app_format", "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/esp_common", "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/esp_hw_support", "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/esp_rom", "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/esp_system", "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/esptool_py", "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/freertos", "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/hal", "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/log", "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/bootloader/subproject/main", "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/bootloader/subproject/components/micro-ecc", "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/newlib", "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/partition_table", "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/soc", "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/spi_flash", "D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/components/xtensa", "" ],
+    "debug_prefix_map_gdbinit": ""
+}

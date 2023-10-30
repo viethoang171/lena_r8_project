@@ -1,0 +1,18 @@
+fatal: detected dubious ownership in repository at 'D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1'
+'D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1' is owned by:
+	'S-1-5-32-544'
+but the current user is:
+	'S-1-5-21-2535044572-3325105256-3315916765-1001'
+To add an exception for this directory, call:
+
+	git config --global --add safe.directory D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1
+CMake Error at D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/tools/cmake/build.cmake:266 (message):
+  Failed to resolve component 'rs485'.
+Call Stack (most recent call first):
+  D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/tools/cmake/build.cmake:308 (__build_resolve_and_add_req)
+  D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/tools/cmake/build.cmake:309 (__build_expand_requirements)
+  D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/tools/cmake/build.cmake:595 (__build_expand_requirements)
+  D:/Sotatek/espDev/Espressif/frameworks/esp-idf-v5.1/tools/cmake/project.cmake:464 (idf_build_process)
+  CMakeLists.txt:7 (project)
+
+
