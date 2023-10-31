@@ -23,13 +23,13 @@
 // CTS is not used in RS485 Half-Duplex Mode
 #define CTS_PIN (UART_PIN_NO_CHANGE)
 
-#define BUF_SIZE (4096)
+#define BUFF_SIZE (4096)
 #define BAUD_RATE (9600)
 
 // Read packet timeout
 #define PACKET_READ_TICS (100 / portTICK_PERIOD_MS)
 #define RX_TASK_STACK_SIZE (4096)
-#define RX_TASK_PRIO (2)
+#define RX_TASK_PRIO (1)
 #define UART_PORT_2 (2)
 
 // Timeout threshold for UART = number of symbols (~10 tics) with unchanged state on receive pin
@@ -41,7 +41,7 @@
 #define ADDRESS_SLAVE_2 0X02
 #define ADDRESS_SLAVE_3 0X03
 
-#define BEE_TIME_TRANSMIT_DATA_RS485 1000
+#define BEE_TIME_TRANSMIT_DATA_RS485 5000
 
 typedef struct
 {

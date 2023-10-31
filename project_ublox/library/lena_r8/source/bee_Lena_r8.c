@@ -11,64 +11,18 @@
 #include <string.h>
 
 #include "bee_cJSON.h"
-#include "bee_Sht3x.h"
 #include "bee_Uart.h"
-#include "bee_Led.h"
 #include "bee_rs485.h"
 #include "bee_Lena_r8.h"
 
-QueueHandle_t queue_message_response;
-TaskHandle_t xHandle_fade_mode;
-TaskHandle_t xHandle_smooth_mode;
-TaskHandle_t xHandle_mix_fade_mode;
+QueueHandle_t queue_message_response; // queue for task subscribe
 
-float f_Sht3x_temp;
-float f_Sht3x_humi;
-
-static uint8_t u8Flag_exist_task_fade_mode = 0;
-static uint8_t u8Flag_exist_task_smooth_mode = 0;
-static uint8_t u8Flag_exist_task_mix_fade_mode = 0;
-static uint8_t u8Trans_code = 0;
 static uint8_t u8Mac_address[6] = {0xb8, 0xd6, 0x1a, 0x6b, 0x2d, 0xe8};
 static char mac_address[13];
 
 static char message_publish[BEE_LENGTH_AT_COMMAND];
-static char message_publish_content_for_publish_mqtt_binary[BEE_LENGTH_AT_COMMAND];
+// static char message_publish_content_for_publish_mqtt_binary[BEE_LENGTH_AT_COMMAND];
 static char message_publish_content_for_publish_mqtt_binary_rs485[BEE_LENGTH_AT_COMMAND_RS485];
-
-static void mqtt_vCreate_content_message_json_data(uint8_t u8Flag_temp_humi, float f_Value)
-{
-    char *message_json_publish;
-    u8Trans_code++;
-    cJSON *root;
-
-    root = cJSON_CreateObject();
-    if (root != NULL)
-    {
-        cJSON_AddItemToObject(root, "thing_token", cJSON_CreateString(mac_address));
-        cJSON_AddItemToObject(root, "cmd_name", cJSON_CreateString("Bee.data"));
-
-        if (u8Flag_temp_humi == FLAG_TEMPERATURE)
-        {
-            cJSON_AddItemToObject(root, "object_type", cJSON_CreateString("temperature"));
-        }
-        else
-        {
-            cJSON_AddItemToObject(root, "object_type", cJSON_CreateString("humidity"));
-        }
-
-        cJSON_AddItemToObject(root, "values", cJSON_CreateNumber(f_Value));
-        cJSON_AddItemToObject(root, "trans_code", cJSON_CreateNumber(u8Trans_code));
-    }
-    message_json_publish = cJSON_Print(root);
-    cJSON_Delete(root);
-
-    if (message_json_publish != NULL)
-    {
-        snprintf(message_publish, BEE_LENGTH_AT_COMMAND, "AT+UMQTTC=9,0,0,%s,%d\r\n", BEE_TOPIC_PUBLISH, strlen(message_json_publish) + 1);
-        snprintf(message_publish_content_for_publish_mqtt_binary, BEE_LENGTH_AT_COMMAND, "%s\r\n", message_json_publish);
-    }
-}
 
 static void lena_vConfigure_credential()
 {
@@ -110,23 +64,10 @@ static void lena_vConnect_mqtt_broker()
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
 }
 
-static void lena_vPublish_data_sensor()
-{
-    // publish temperature value
-    mqtt_vCreate_content_message_json_data(FLAG_TEMPERATURE, f_Sht3x_temp);
-    uart_write_bytes(EX_UART_NUM, message_publish, strlen(message_publish));
-    uart_write_bytes(EX_UART_NUM, message_publish_content_for_publish_mqtt_binary, strlen(message_publish_content_for_publish_mqtt_binary) + 1);
-
-    // publish humidity value
-    mqtt_vCreate_content_message_json_data(FLAG_HUMIDITY, f_Sht3x_humi);
-    uart_write_bytes(EX_UART_NUM, message_publish, strlen(message_publish));
-    uart_write_bytes(EX_UART_NUM, message_publish_content_for_publish_mqtt_binary, strlen(message_publish_content_for_publish_mqtt_binary) + 1);
-}
-
 static void lena_vPublish_data_rs485()
 {
     // Create AT command to publish json message rs485
-    char *message_json_rs485 = (char *)calloc(800, sizeof(char));
+    char *message_json_rs485 = (char *)calloc(BEE_LENGTH_AT_COMMAND_RS485, sizeof(char));
     message_json_rs485 = pack_3pha_data();
 
     snprintf(message_publish, BEE_LENGTH_AT_COMMAND, "AT+UMQTTC=9,0,0,%s,%d\r\n", BEE_TOPIC_PUBLISH, strlen(message_json_rs485) + 1);
@@ -147,11 +88,6 @@ static void mqtt_vPublish_task()
 
     for (;;)
     {
-        if (xTaskGetTickCount() - last_time_publish > pdMS_TO_TICKS(BEE_TIME_PUBLISH_DATA_SENSOR))
-        {
-            lena_vPublish_data_sensor();
-            last_time_publish = xTaskGetTickCount();
-        }
         if (xTaskGetTickCount() - last_time_publish > pdMS_TO_TICKS(BEE_TIME_PUBLISH_DATA_RS485))
         {
             lena_vPublish_data_rs485();
@@ -161,6 +97,7 @@ static void mqtt_vPublish_task()
     }
 }
 
+#if (0) // parse json for task subscribe
 static void mqtt_vParse_json(char *rxBuffer)
 {
     cJSON *root = cJSON_Parse(rxBuffer);
@@ -173,126 +110,12 @@ static void mqtt_vParse_json(char *rxBuffer)
         device_id = cJSON_GetObjectItemCaseSensitive(root, "thing_token")->valuestring;
         cmd_name = cJSON_GetObjectItemCaseSensitive(root, "cmd_name")->valuestring;
 
-        if (device_id != NULL && cmd_name != NULL)
-        {
-            if (strcmp(device_id, mac_address) == 0 && strcmp(cmd_name, "Bee.data") == 0)
-            {
-                object_type = cJSON_GetObjectItemCaseSensitive(root, "object_type")->valuestring;
-                if (object_type != NULL)
-                {
-                    if (strcmp(object_type, OBJECT_TYPE_TEMP) == 0)
-                    {
-                        mqtt_vCreate_content_message_json_data(FLAG_TEMPERATURE, f_Sht3x_temp);
-                    }
-                    else if (strcmp(object_type, OBJECT_TYPE_HUM) == 0)
-                    {
-                        mqtt_vCreate_content_message_json_data(FLAG_HUMIDITY, f_Sht3x_humi);
-                    }
-                }
-            }
-            else if (strcmp(device_id, mac_address) == 0 && strcmp(cmd_name, "Bee.control_led_fade_mode") == 0)
-            {
-                if (u8Flag_exist_task_smooth_mode == BEE_EXIST_MODE_LED)
-                {
-                    vTaskSuspend(xHandle_smooth_mode);
-                }
-                if (u8Flag_exist_task_mix_fade_mode == BEE_EXIST_MODE_LED)
-                {
-                    vTaskSuspend(xHandle_mix_fade_mode);
-                }
-
-                if (u8Flag_exist_task_fade_mode == BEE_EXIST_MODE_LED)
-                {
-                    vTaskResume(xHandle_fade_mode);
-                }
-                else
-                {
-                    u8Flag_exist_task_fade_mode = BEE_EXIST_MODE_LED;
-                    xTaskCreate(ledc_fade_mode_task, "ledc_fade_mode_task", 1024, NULL, 1, &xHandle_fade_mode);
-                }
-            }
-            else if (strcmp(device_id, mac_address) == 0 && strcmp(cmd_name, "Bee.control_led_smooth_mode") == 0)
-            {
-                if (u8Flag_exist_task_fade_mode == BEE_EXIST_MODE_LED)
-                {
-                    vTaskSuspend(xHandle_fade_mode);
-                }
-                if (u8Flag_exist_task_mix_fade_mode == BEE_EXIST_MODE_LED)
-                {
-                    vTaskSuspend(xHandle_mix_fade_mode);
-                }
-
-                if (u8Flag_exist_task_smooth_mode == BEE_EXIST_MODE_LED)
-                {
-                    vTaskResume(xHandle_smooth_mode);
-                }
-                else
-                {
-                    u8Flag_exist_task_smooth_mode = BEE_EXIST_MODE_LED;
-                    xTaskCreate(ledc_smooth_mode_task, "ledc_smooth_mode_task", 1024, NULL, 1, &xHandle_smooth_mode);
-                }
-            }
-            else if (strcmp(device_id, mac_address) == 0 && strcmp(cmd_name, "Bee.control_led_mix_fade_mode") == 0)
-            {
-                if (u8Flag_exist_task_fade_mode == BEE_EXIST_MODE_LED)
-                {
-                    vTaskSuspend(xHandle_fade_mode);
-                }
-                if (u8Flag_exist_task_smooth_mode == BEE_EXIST_MODE_LED)
-                {
-                    vTaskSuspend(xHandle_smooth_mode);
-                }
-
-                if (u8Flag_exist_task_mix_fade_mode == BEE_EXIST_MODE_LED)
-                {
-                    vTaskResume(xHandle_mix_fade_mode);
-                }
-                else
-                {
-                    u8Flag_exist_task_mix_fade_mode = BEE_EXIST_MODE_LED;
-                    xTaskCreate(ledc_mix_fade_mode_task, "ledc_mix_fade_mode_task", 1024, NULL, 1, &xHandle_mix_fade_mode);
-                }
-            }
-
-            else if (strcmp(device_id, mac_address) == 0 && strcmp(cmd_name, "Bee.control_rgb") == 0)
-            {
-                cJSON *values = cJSON_GetObjectItem(root, "values");
-                if (values != NULL)
-                {
-                    cJSON *red = cJSON_GetObjectItem(values, "red");
-                    cJSON *green = cJSON_GetObjectItem(values, "green");
-                    cJSON *blue = cJSON_GetObjectItem(values, "blue");
-
-                    if (red != NULL && green != NULL && blue != NULL)
-                    {
-                        // Lấy các giá trị red, green, blue
-                        uint8_t red_value = red->valueint;
-                        uint8_t green_value = green->valueint;
-                        uint8_t blue_value = blue->valueint;
-
-                        // Pause other modes
-                        if (u8Flag_exist_task_fade_mode)
-                        {
-                            vTaskSuspend(xHandle_fade_mode);
-                        }
-                        if (u8Flag_exist_task_smooth_mode)
-                        {
-                            vTaskSuspend(xHandle_smooth_mode);
-                        }
-                        if (u8Flag_exist_task_mix_fade_mode)
-                        {
-                            vTaskSuspend(xHandle_mix_fade_mode);
-                        }
-
-                        ledc_set_duty_rgb(red_value, green_value, blue_value);
-                    }
-                }
-            }
-        }
         cJSON_Delete(root);
     }
 }
+#endif
 
+#if (0) // Add task subscribe
 static void mqtt_vSubscribe_command_server_task()
 {
 
@@ -341,14 +164,14 @@ static void mqtt_vSubscribe_command_server_task()
     free(dtmp);
     dtmp = NULL;
 }
+#endif
 
 void mqtt_vLena_r8_start()
 {
     snprintf(mac_address, sizeof(mac_address), "%02x%02x%02x%02x%02x%02x", u8Mac_address[0], u8Mac_address[1], u8Mac_address[2], u8Mac_address[3], u8Mac_address[4], u8Mac_address[5]);
-    ledc_init_hardware();
 
-    xTaskCreate(mqtt_vPublish_task, "mqtt_vPublish_task", 1024 * 3, NULL, 4, NULL);
-    xTaskCreate(mqtt_vSubscribe_command_server_task, "mqtt_vSubscribe_command_server_task", 1024 * 3, NULL, 5, NULL);
+    xTaskCreate(mqtt_vPublish_task, "mqtt_vPublish_task", 1024 * 3, NULL, 3, NULL);
+    // xTaskCreate(mqtt_vSubscribe_command_server_task, "mqtt_vSubscribe_command_server_task", 1024 * 3, NULL, 4, NULL);
 }
 /****************************************************************************/
 /***        END OF FILE                                                   ***/

@@ -7,9 +7,6 @@
 #ifndef __LENA_R8_H__
 #define __LENA_R8_H__
 
-#define FLAG_TEMPERATURE 1
-#define FLAG_HUMIDITY 0
-
 #define BEE_MQTT_BROKER_URL "\"61.28.238.97\""
 #define BEE_BROKER_PORT "1993"
 #define BEE_USER_NAME "\"VBeeHome\""
@@ -22,7 +19,6 @@
 #define BEE_TOPIC_SUBSCRIBE "\"VB/DMP/VBEEON/BEE/SMH/b8d61a6b2de8/command\""
 #define BEE_TOPIC_PUBLISH "\"VB/DMP/VBEEON/BEE/SMH/b8d61a6b2de8/telemetry\""
 
-#define BEE_TIME_PUBLISH_DATA_SENSOR 30000
 #define BEE_TIME_PUBLISH_DATA_RS485 10000
 #define BEE_QUEUE_LENGTH 30
 
@@ -30,8 +26,6 @@
 #define BEE_LENGTH_AT_COMMAND_RS485 800
 
 #define TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE 5
-
-#define BEE_EXIST_MODE_LED 1
 
 void mqtt_vLena_r8_start();
 

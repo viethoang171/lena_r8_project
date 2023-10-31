@@ -7,11 +7,11 @@
  *
  ***************************************************************************/
 
-#include <stdio.h>
-#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/portmacro.h"
+#include <stdio.h>
+#include <string.h>
 #include "esp_system.h"
 #include "driver/uart.h"
 #include "freertos/queue.h"
@@ -154,7 +154,7 @@ void rs485_init()
 
     ESP_LOGI(TAG, "Start RS485 application and configure UART.");
 
-    ESP_ERROR_CHECK(uart_driver_install(uart_num, BUF_SIZE * 2, 0, 10, &uart_queue, 0));
+    ESP_ERROR_CHECK(uart_driver_install(uart_num, BUFF_SIZE * 2, 0, 10, &uart_queue, 0));
 
     // Configure UART parameters
     ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
@@ -184,19 +184,19 @@ void TX(const int port, const char *str, uint8_t length)
 void RX_task(void *pvParameters)
 {
     uart_event_t event;
-    uint8_t *dtmp = (uint8_t *)malloc(BUF_SIZE);
+    uint8_t *dtmp = (uint8_t *)malloc(BUFF_SIZE);
     for (;;)
     {
         // Waiting for UART event.
         if (xQueueReceive(uart_queue, (void *)&event, (TickType_t)portMAX_DELAY))
         {
-            bzero(dtmp, BUF_SIZE);
+            bzero(dtmp, BUFF_SIZE);
             uart_read_bytes(UART_PORT_2, dtmp, event.size, portMAX_DELAY);
 
             // Tính toán CRC16 cho dữ liệu gốc
             uint16_t crc_caculated = MODBUS_CRC16(dtmp, event.size - 2);
             uint16_t crc_received = combine_2Bytes(dtmp[event.size - 1], dtmp[event.size - 2]);
-            if (crc_caculated == crc_received && (event.size > 10))
+            if (crc_caculated == crc_received)
             {
                 // In chuỗi nhận được theo dạng hexa
                 printf("str RX: ");
@@ -313,7 +313,7 @@ static void TX_task(void *pvParameters)
     char *str_tx = read_holding_registers(0x01);
     for (;;)
     {
-        if (xTaskGetTickCount() - last_time_transmit > pdMS_TO_TICKS(BEE_TIME_TRANSMIT_DATA_RS485))
+        if (xTaskGetTickCount() - last_time_transmit >= pdMS_TO_TICKS(BEE_TIME_TRANSMIT_DATA_RS485))
         {
             if (str_tx != NULL)
             {
@@ -334,7 +334,7 @@ static void TX_task(void *pvParameters)
 void rs485_start()
 {
     xTaskCreate(RX_task, "RX_task", RX_TASK_STACK_SIZE * 2, NULL, RX_TASK_PRIO, NULL);
-    xTaskCreate(TX_task, "TX_task", 4096 * 2, NULL, 3, NULL);
+    xTaskCreate(TX_task, "TX_task", 4096 * 2, NULL, 2, NULL);
 }
 
 /****************************************************************************/
