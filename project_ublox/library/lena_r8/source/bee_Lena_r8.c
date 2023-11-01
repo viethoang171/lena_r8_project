@@ -32,14 +32,17 @@ static void lena_vConfigure_credential()
     // config client Id
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTT=0,%s\r\n", BEE_MQTT_CLIENT_ID);
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+    vTaskDelay(pdMS_TO_TICKS(2000));
 
     // config IP broker and port
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTT=3,%s,%s\r\n", BEE_MQTT_BROKER_URL, BEE_BROKER_PORT);
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+    vTaskDelay(pdMS_TO_TICKS(2000));
 
     // config broker user name and password
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTT=4,%s,%s\r\n", BEE_USER_NAME, BEE_USER_PASSWORD);
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+    vTaskDelay(pdMS_TO_TICKS(2000));
 }
 
 static void lena_vConnect_mqtt_broker()
