@@ -7,6 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "driver/uart.h"
+#include "esp_wifi.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -15,7 +16,7 @@
 #include "bee_rs485.h"
 #include "bee_Lena_r8.h"
 
-QueueHandle_t queue_message_response; // queue for task subscribe
+// QueueHandle_t queue_message_response; // queue for task subscribe
 
 static uint8_t u8Mac_address[6] = {0xb8, 0xd6, 0x1a, 0x6b, 0x2d, 0xe8};
 static char mac_address[13];
@@ -53,6 +54,7 @@ static void lena_vConnect_mqtt_broker()
     // CGACT
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGACT=1,1\r\n");
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+    vTaskDelay(pdMS_TO_TICKS(2000));
 
     // AT connect
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTTC=1\r\n");
@@ -62,22 +64,25 @@ static void lena_vConnect_mqtt_broker()
     // create AT command to subscribe topic on broker
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTTC=4,0,%s\r\n", BEE_TOPIC_SUBSCRIBE);
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+    vTaskDelay(pdMS_TO_TICKS(2000));
 }
 
 static void lena_vPublish_data_rs485()
 {
     // Create AT command to publish json message rs485
     char *message_json_rs485 = (char *)calloc(BEE_LENGTH_AT_COMMAND_RS485, sizeof(char));
-    message_json_rs485 = pack_3pha_data();
+    message_json_rs485 = pack_json_3pha_data();
 
     snprintf(message_publish, BEE_LENGTH_AT_COMMAND, "AT+UMQTTC=9,0,0,%s,%d\r\n", BEE_TOPIC_PUBLISH, strlen(message_json_rs485) + 1);
     snprintf(message_publish_content_for_publish_mqtt_binary_rs485, BEE_LENGTH_AT_COMMAND_RS485, "%s\r\n", message_json_rs485);
 
     // Send AT command
     uart_write_bytes(EX_UART_NUM, message_publish, strlen(message_publish));
+    vTaskDelay(pdMS_TO_TICKS(10));
 
     // Send content to publish
     uart_write_bytes(EX_UART_NUM, message_publish_content_for_publish_mqtt_binary_rs485, strlen(message_publish_content_for_publish_mqtt_binary_rs485) + 1);
+    vTaskDelay(pdMS_TO_TICKS(10));
 }
 
 static void mqtt_vPublish_task()
@@ -88,7 +93,7 @@ static void mqtt_vPublish_task()
 
     for (;;)
     {
-        if (xTaskGetTickCount() - last_time_publish > pdMS_TO_TICKS(BEE_TIME_PUBLISH_DATA_RS485))
+        if (xTaskGetTickCount() - last_time_publish >= pdMS_TO_TICKS(BEE_TIME_PUBLISH_DATA_RS485))
         {
             lena_vPublish_data_rs485();
             last_time_publish = xTaskGetTickCount();
@@ -168,9 +173,11 @@ static void mqtt_vSubscribe_command_server_task()
 
 void mqtt_vLena_r8_start()
 {
+    esp_wifi_get_mac(ESP_IF_WIFI_STA, u8Mac_address);
     snprintf(mac_address, sizeof(mac_address), "%02x%02x%02x%02x%02x%02x", u8Mac_address[0], u8Mac_address[1], u8Mac_address[2], u8Mac_address[3], u8Mac_address[4], u8Mac_address[5]);
 
     xTaskCreate(mqtt_vPublish_task, "mqtt_vPublish_task", 1024 * 3, NULL, 3, NULL);
+
     // xTaskCreate(mqtt_vSubscribe_command_server_task, "mqtt_vSubscribe_command_server_task", 1024 * 3, NULL, 4, NULL);
 }
 /****************************************************************************/

@@ -14,26 +14,26 @@
 /***        Macro Definitions                                             ***/
 /****************************************************************************/
 
-#define TX_PIN (17)
-#define RX_PIN (16)
+#define TX_PIN (5)
+#define RX_PIN (6)
 
 // RTS for RS485 Half-Duplex Mode manages DE/~RE
-#define RTS_PIN (4)
+#define RTS_PIN (7)
 
 // CTS is not used in RS485 Half-Duplex Mode
 #define CTS_PIN (UART_PIN_NO_CHANGE)
 
-#define BUFF_SIZE (4096)
+#define BUFF_SIZE (256)
 #define BAUD_RATE (9600)
 
 // Read packet timeout
 #define PACKET_READ_TICS (100 / portTICK_PERIOD_MS)
 #define RX_TASK_STACK_SIZE (4096)
-#define RX_TASK_PRIO (1)
+#define RX_TASK_PRIO (30)
 #define UART_PORT_2 (2)
 
 // Timeout threshold for UART = number of symbols (~10 tics) with unchanged state on receive pin
-#define RX_READ_TOUT (3) // 3.5T * 8 = 28 ticks, TOUT=3 -> ~24..33 ticks
+#define RX_READ_TOUT (9) // 3.5T * 8 = 28 ticks, TOUT=3 -> ~24..33 ticks
 
 #define CRC8_POLYNOMIAL 0x31
 
@@ -141,7 +141,7 @@ char *read_holding_registers(uint8_t slave_addr);
  *         The caller is responsible for freeing the memory when done using it.
  *         Returns NULL if memory allocation fails.
  */
-char *pack_3pha_data(void);
+char *pack_json_3pha_data(void);
 void rs485_start(void);
 
 #endif

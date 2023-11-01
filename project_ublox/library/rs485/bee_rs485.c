@@ -7,16 +7,17 @@
  *
  ***************************************************************************/
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/portmacro.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "esp_system.h"
 #include "driver/uart.h"
 #include "freertos/queue.h"
 #include "esp_log.h"
-#include "esp_wifi.h"
+#include "sdkconfig.h"
+#include "esp_mac.h"
 
 #include "bee_cJSON.h"
 #include "bee_rs485.h"
@@ -31,14 +32,32 @@ data_3pha_t data_3pha;
 /***        Local Functions                                               ***/
 /****************************************************************************/
 
-static uint16_t combine_2Bytes(uint8_t highByte, uint8_t lowByte)
+static uint16_t combine_2Bytes_unsigned(uint8_t highByte, uint8_t lowByte)
 {
+    if (highByte == 0xff && lowByte == 0xff)
+    {
+        return 0;
+    }
     return ((uint16_t)highByte << 8) | lowByte;
 }
 
-static uint32_t combine_4Bytes(uint8_t highByte1, uint8_t lowByte1, uint8_t highByte2, uint8_t lowByte2)
+static uint32_t combine_4Bytes_unsingned(uint8_t highByte1, uint8_t lowByte1, uint8_t highByte2, uint8_t lowByte2)
 {
+    if (highByte1 == 0xff && lowByte1 == 0xff && highByte2 == 0xff && lowByte2 == 0xff)
+    {
+        return 0;
+    }
     return ((uint32_t)highByte1 << 24) | (lowByte1 << 16) | (highByte2 << 8) | lowByte2;
+}
+
+static int32_t combine_4Bytes_singned(int8_t highByte1, int8_t lowByte1, int8_t highByte2, int8_t lowByte2)
+{
+    int32_t result = ((int32_t)((int8_t)highByte1) << 24) | ((int8_t)lowByte1 << 16) | ((int8_t)highByte2 << 8) | lowByte2;
+    if (result == 0xffffffff)
+    {
+        return 0;
+    }
+    return result;
 }
 
 static uint16_t MODBUS_CRC16(uint8_t *buf, uint16_t len)
@@ -89,46 +108,39 @@ static uint16_t MODBUS_CRC16(uint8_t *buf, uint16_t len)
     return crc;
 }
 
-void read_data_holding_registers(uint8_t *dtmp_buf)
+static void read_data_holding_registers(uint8_t *dtmp_buf)
 {
-    data_3pha.voltage3pha = combine_4Bytes(dtmp_buf[3], dtmp_buf[4], dtmp_buf[5], dtmp_buf[6]);
-    data_3pha.voltageL1 = combine_4Bytes(dtmp_buf[7], dtmp_buf[8], dtmp_buf[9], dtmp_buf[10]);
-    data_3pha.voltageL2 = combine_4Bytes(dtmp_buf[11], dtmp_buf[12], dtmp_buf[13], dtmp_buf[14]);
-    data_3pha.voltageL3 = combine_4Bytes(dtmp_buf[15], dtmp_buf[16], dtmp_buf[17], dtmp_buf[18]);
+    data_3pha.voltage3pha = combine_4Bytes_unsingned(dtmp_buf[3], dtmp_buf[4], dtmp_buf[5], dtmp_buf[6]);
+    data_3pha.voltageL1 = combine_4Bytes_unsingned(dtmp_buf[7], dtmp_buf[8], dtmp_buf[9], dtmp_buf[10]);
+    data_3pha.voltageL2 = combine_4Bytes_unsingned(dtmp_buf[11], dtmp_buf[12], dtmp_buf[13], dtmp_buf[14]);
+    data_3pha.voltageL3 = combine_4Bytes_unsingned(dtmp_buf[15], dtmp_buf[16], dtmp_buf[17], dtmp_buf[18]);
 
-    data_3pha.voltageL1L2 = combine_4Bytes(dtmp_buf[19], dtmp_buf[20], dtmp_buf[21], dtmp_buf[22]);
-    data_3pha.voltageL3L2 = combine_4Bytes(dtmp_buf[23], dtmp_buf[24], dtmp_buf[25], dtmp_buf[26]);
-    data_3pha.voltageL1L3 = combine_4Bytes(dtmp_buf[27], dtmp_buf[28], dtmp_buf[29], dtmp_buf[30]);
+    data_3pha.voltageL1L2 = combine_4Bytes_unsingned(dtmp_buf[19], dtmp_buf[20], dtmp_buf[21], dtmp_buf[22]);
+    data_3pha.voltageL3L2 = combine_4Bytes_unsingned(dtmp_buf[23], dtmp_buf[24], dtmp_buf[25], dtmp_buf[26]);
+    data_3pha.voltageL1L3 = combine_4Bytes_unsingned(dtmp_buf[27], dtmp_buf[28], dtmp_buf[29], dtmp_buf[30]);
 
-    data_3pha.current3pha = combine_4Bytes(dtmp_buf[31], dtmp_buf[32], dtmp_buf[33], dtmp_buf[34]);
-    data_3pha.currentL1 = combine_4Bytes(dtmp_buf[35], dtmp_buf[36], dtmp_buf[37], dtmp_buf[38]);
-    data_3pha.currentL2 = combine_4Bytes(dtmp_buf[39], dtmp_buf[40], dtmp_buf[41], dtmp_buf[42]);
-    data_3pha.currentL3 = combine_4Bytes(dtmp_buf[43], dtmp_buf[44], dtmp_buf[45], dtmp_buf[46]);
-    data_3pha.currentN = combine_4Bytes(dtmp_buf[47], dtmp_buf[48], dtmp_buf[49], dtmp_buf[50]);
+    data_3pha.current3pha = combine_4Bytes_unsingned(dtmp_buf[31], dtmp_buf[32], dtmp_buf[33], dtmp_buf[34]);
+    data_3pha.currentL1 = combine_4Bytes_unsingned(dtmp_buf[35], dtmp_buf[36], dtmp_buf[37], dtmp_buf[38]);
+    data_3pha.currentL2 = combine_4Bytes_unsingned(dtmp_buf[39], dtmp_buf[40], dtmp_buf[41], dtmp_buf[42]);
+    data_3pha.currentL3 = combine_4Bytes_unsingned(dtmp_buf[43], dtmp_buf[44], dtmp_buf[45], dtmp_buf[46]);
+    data_3pha.currentN = combine_4Bytes_unsingned(dtmp_buf[47], dtmp_buf[48], dtmp_buf[49], dtmp_buf[50]);
 
-    data_3pha.actpower3pha = combine_4Bytes(dtmp_buf[55], dtmp_buf[56], dtmp_buf[57], dtmp_buf[58]);
-    data_3pha.actpowerL1 = combine_4Bytes(dtmp_buf[59], dtmp_buf[60], dtmp_buf[61], dtmp_buf[62]);
-    data_3pha.actpowerL2 = combine_4Bytes(dtmp_buf[63], dtmp_buf[64], dtmp_buf[65], dtmp_buf[66]);
-    data_3pha.actpowerL3 = combine_4Bytes(dtmp_buf[67], dtmp_buf[68], dtmp_buf[69], dtmp_buf[70]);
+    data_3pha.actpower3pha = combine_4Bytes_singned(dtmp_buf[55], dtmp_buf[56], dtmp_buf[57], dtmp_buf[58]);
+    data_3pha.actpowerL1 = combine_4Bytes_singned(dtmp_buf[59], dtmp_buf[60], dtmp_buf[61], dtmp_buf[62]);
+    data_3pha.actpowerL2 = combine_4Bytes_singned(dtmp_buf[63], dtmp_buf[64], dtmp_buf[65], dtmp_buf[66]);
+    data_3pha.actpowerL3 = combine_4Bytes_singned(dtmp_buf[67], dtmp_buf[68], dtmp_buf[69], dtmp_buf[70]);
 
-    data_3pha.ractpower3pha = combine_4Bytes(dtmp_buf[71], dtmp_buf[72], dtmp_buf[73], dtmp_buf[74]);
-    data_3pha.ractpowerL1 = combine_4Bytes(dtmp_buf[75], dtmp_buf[76], dtmp_buf[77], dtmp_buf[78]);
-    data_3pha.ractpowerL2 = combine_4Bytes(dtmp_buf[79], dtmp_buf[80], dtmp_buf[81], dtmp_buf[82]);
-    data_3pha.ractpowerL3 = combine_4Bytes(dtmp_buf[83], dtmp_buf[84], dtmp_buf[85], dtmp_buf[86]);
+    data_3pha.ractpower3pha = combine_4Bytes_singned(dtmp_buf[71], dtmp_buf[72], dtmp_buf[73], dtmp_buf[74]);
+    data_3pha.ractpowerL1 = combine_4Bytes_singned(dtmp_buf[75], dtmp_buf[76], dtmp_buf[77], dtmp_buf[78]);
+    data_3pha.ractpowerL2 = combine_4Bytes_singned(dtmp_buf[79], dtmp_buf[80], dtmp_buf[81], dtmp_buf[82]);
+    data_3pha.ractpowerL3 = combine_4Bytes_singned(dtmp_buf[83], dtmp_buf[84], dtmp_buf[85], dtmp_buf[86]);
 
-    data_3pha.aprtpower3pha = combine_4Bytes(dtmp_buf[87], dtmp_buf[88], dtmp_buf[89], dtmp_buf[90]);
-    data_3pha.aprtpowerL1 = combine_4Bytes(dtmp_buf[91], dtmp_buf[92], dtmp_buf[93], dtmp_buf[94]);
-    data_3pha.aprtpowerL2 = combine_4Bytes(dtmp_buf[95], dtmp_buf[96], dtmp_buf[97], dtmp_buf[98]);
-    data_3pha.aprtpowerL3 = combine_4Bytes(dtmp_buf[99], dtmp_buf[100], dtmp_buf[101], dtmp_buf[102]);
+    data_3pha.aprtpower3pha = combine_4Bytes_singned(dtmp_buf[87], dtmp_buf[88], dtmp_buf[89], dtmp_buf[90]);
+    data_3pha.aprtpowerL1 = combine_4Bytes_singned(dtmp_buf[91], dtmp_buf[92], dtmp_buf[93], dtmp_buf[94]);
+    data_3pha.aprtpowerL2 = combine_4Bytes_singned(dtmp_buf[95], dtmp_buf[96], dtmp_buf[97], dtmp_buf[98]);
+    data_3pha.aprtpowerL3 = combine_4Bytes_singned(dtmp_buf[99], dtmp_buf[100], dtmp_buf[101], dtmp_buf[102]);
 
-    data_3pha.Frequency = combine_2Bytes(dtmp_buf[103], dtmp_buf[104]);
-
-    printf("phase_voltage_3pha: %08lX\n", data_3pha.voltage3pha);
-    printf("phase_voltage_l1: %lu\n", data_3pha.voltageL1);
-    printf("currentL1: %lu\n", data_3pha.currentL1);
-    printf("aprtpowerL1: %lu\n", data_3pha.aprtpowerL1);
-
-    printf("frequency: %u\n", data_3pha.Frequency);
+    data_3pha.Frequency = combine_2Bytes_unsigned(dtmp_buf[103], dtmp_buf[104]);
 }
 
 /****************************************************************************/
@@ -195,8 +207,8 @@ void RX_task(void *pvParameters)
 
             // Tính toán CRC16 cho dữ liệu gốc
             uint16_t crc_caculated = MODBUS_CRC16(dtmp, event.size - 2);
-            uint16_t crc_received = combine_2Bytes(dtmp[event.size - 1], dtmp[event.size - 2]);
-            if (crc_caculated == crc_received)
+            uint16_t crc_received = combine_2Bytes_unsigned(dtmp[event.size - 1], dtmp[event.size - 2]);
+            if (crc_caculated == crc_received && (event.size > 0))
             {
                 // In chuỗi nhận được theo dạng hexa
                 printf("str RX: ");
@@ -252,11 +264,11 @@ char *read_holding_registers(uint8_t slave_addr)
 }
 
 uint8_t trans_code = 0;
-char *pack_3pha_data(void)
+char *pack_json_3pha_data(void)
 {
     char mac_str[13];
     uint8_t mac[6];
-    esp_wifi_get_mac(ESP_IF_WIFI_STA, mac);
+    esp_efuse_mac_get_default(mac);
     snprintf(mac_str, sizeof(mac_str), "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     cJSON *json_3pha_data = cJSON_CreateObject();
@@ -313,7 +325,7 @@ static void TX_task(void *pvParameters)
     char *str_tx = read_holding_registers(0x01);
     for (;;)
     {
-        if (xTaskGetTickCount() - last_time_transmit >= pdMS_TO_TICKS(BEE_TIME_TRANSMIT_DATA_RS485))
+        if (xTaskGetTickCount() - last_time_transmit > pdMS_TO_TICKS(BEE_TIME_TRANSMIT_DATA_RS485))
         {
             if (str_tx != NULL)
             {
@@ -334,7 +346,7 @@ static void TX_task(void *pvParameters)
 void rs485_start()
 {
     xTaskCreate(RX_task, "RX_task", RX_TASK_STACK_SIZE * 2, NULL, RX_TASK_PRIO, NULL);
-    xTaskCreate(TX_task, "TX_task", 4096 * 2, NULL, 2, NULL);
+    xTaskCreate(TX_task, "TX_task", 4096 * 2, NULL, 3, NULL);
 }
 
 /****************************************************************************/
