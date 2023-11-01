@@ -19,6 +19,7 @@
 // QueueHandle_t queue_message_response; // queue for task subscribe
 
 extern bool check_data_flag;
+extern uint8_t trans_code;
 
 static char BEE_TOPIC_SUBSCRIBE[100];
 static char BEE_TOPIC_PUBLISH[100];
@@ -29,6 +30,7 @@ static char mac_address[13];
 static char message_publish[BEE_LENGTH_AT_COMMAND];
 // static char message_publish_content_for_publish_mqtt_binary[BEE_LENGTH_AT_COMMAND];
 static char message_publish_content_for_publish_mqtt_binary_rs485[BEE_LENGTH_AT_COMMAND_RS485];
+static char message_publish_content_for_publish_mqtt_binary_keep_alive[BEE_LENGTH_AT_COMMAND];
 
 static void lena_vConfigure_credential()
 {
@@ -91,9 +93,42 @@ static void lena_vPublish_data_rs485()
     uart_write_bytes(EX_UART_NUM, message_publish_content_for_publish_mqtt_binary_rs485, strlen(message_publish_content_for_publish_mqtt_binary_rs485) + 1);
 }
 
+static char *cCreate_message_json_keep_alive()
+{
+    cJSON *json_keep_alive, *values;
+    json_keep_alive = cJSON_CreateObject();
+
+    cJSON_AddItemToObject(json_keep_alive, "thing_token", cJSON_CreateString(mac_address));
+    cJSON_AddItemToObject(json_keep_alive, "values", values = cJSON_CreateObject());
+    cJSON_AddItemToObject(values, "eventType", cJSON_CreateString("refresh"));
+    cJSON_AddItemToObject(values, "status", cJSON_CreateString("ONLINE"));
+    cJSON_AddItemToObject(json_keep_alive, "trans_code", cJSON_CreateNumber(trans_code));
+    char *message_keep_alive_json = cJSON_Print(json_keep_alive);
+    cJSON_Delete(json_keep_alive);
+
+    return message_keep_alive_json;
+}
+
+static void lena_vPublish_keep_alive()
+{
+    // Create AT command to publish keep alive
+    char *message_json_keep_alive = (char *)calloc(BEE_LENGTH_AT_COMMAND_RS485, sizeof(char));
+    message_json_keep_alive = cCreate_message_json_keep_alive();
+
+    snprintf(message_publish, BEE_LENGTH_AT_COMMAND, "AT+UMQTTC=9,0,0,%s,%d\r\n", BEE_TOPIC_PUBLISH, strlen(message_json_keep_alive) + 1);
+    snprintf(message_publish_content_for_publish_mqtt_binary_keep_alive, BEE_LENGTH_AT_COMMAND, "%s\r\n", message_json_keep_alive);
+
+    // Send AT command
+    uart_write_bytes(EX_UART_NUM, message_publish, strlen(message_publish));
+
+    // Send content to publish
+    uart_write_bytes(EX_UART_NUM, message_publish_content_for_publish_mqtt_binary_keep_alive, strlen(message_publish_content_for_publish_mqtt_binary_keep_alive) + 1);
+}
+
 static void mqtt_vPublish_task()
 {
     static TickType_t last_time_publish = 0;
+    static TickType_t last_time_keep_alive = 0;
     lena_vConfigure_credential();
     lena_vConnect_mqtt_broker();
 
@@ -107,6 +142,11 @@ static void mqtt_vPublish_task()
                 check_data_flag = 0; // reset data's status
             }
             last_time_publish = xTaskGetTickCount();
+        }
+        if (xTaskGetTickCount() - last_time_keep_alive >= pdMS_TO_TICKS(BEE_TIME_PUBLISH_DATA_KEEP_ALIVE))
+        {
+            lena_vPublish_keep_alive();
+            last_time_keep_alive = xTaskGetTickCount();
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }

@@ -13,10 +13,8 @@
 #define BEE_USER_PASSWORD "\"123abcA@!\""
 #define BEE_MQTT_CLIENT_ID "\"device:029f567e-767a-4250-bd7b-6dfa6191f38b\""
 
-#define OBJECT_TYPE_TEMP "temperature"
-#define OBJECT_TYPE_HUM "humidity"
-
 #define BEE_TIME_PUBLISH_DATA_RS485 10000
+#define BEE_TIME_PUBLISH_DATA_KEEP_ALIVE 60000
 #define BEE_QUEUE_LENGTH 30
 
 #define BEE_LENGTH_AT_COMMAND 250
