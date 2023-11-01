@@ -24,9 +24,8 @@
 
 #define TAG "RS485"
 
-static QueueHandle_t uart_queue;
-
 data_3pha_t data_3pha;
+bool check_data_flag = 0;
 
 /****************************************************************************/
 /***        Local Functions                                               ***/
@@ -50,10 +49,10 @@ static uint32_t combine_4Bytes_unsingned(uint8_t highByte1, uint8_t lowByte1, ui
     return ((uint32_t)highByte1 << 24) | (lowByte1 << 16) | (highByte2 << 8) | lowByte2;
 }
 
-static int32_t combine_4Bytes_singned(int8_t highByte1, int8_t lowByte1, int8_t highByte2, int8_t lowByte2)
+static int32_t combine_4Bytes_singned(uint8_t highByte1, uint8_t lowByte1, uint8_t highByte2, uint8_t lowByte2)
 {
-    int32_t result = ((int32_t)((int8_t)highByte1) << 24) | ((int8_t)lowByte1 << 16) | ((int8_t)highByte2 << 8) | lowByte2;
-    if (result == 0xffffffff)
+    int32_t result = ((int32_t)highByte1 << 24) | lowByte1 << 16 | highByte2 << 8 | lowByte2;
+    if (highByte1 == 0x7f && lowByte1 == 0xff && highByte2 == 0xff && lowByte2 == 0xff)
     {
         return 0;
     }
@@ -166,7 +165,7 @@ void rs485_init()
 
     ESP_LOGI(TAG, "Start RS485 application and configure UART.");
 
-    ESP_ERROR_CHECK(uart_driver_install(uart_num, BUFF_SIZE * 2, 0, 10, &uart_queue, 0));
+    ESP_ERROR_CHECK(uart_driver_install(uart_num, BUFF_SIZE * 2, 0, 0, NULL, 0));
 
     // Configure UART parameters
     ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
@@ -195,24 +194,20 @@ void TX(const int port, const char *str, uint8_t length)
 
 void RX_task(void *pvParameters)
 {
-    uart_event_t event;
     uint8_t *dtmp = (uint8_t *)malloc(BUFF_SIZE);
     for (;;)
     {
-        // Waiting for UART event.
-        if (xQueueReceive(uart_queue, (void *)&event, (TickType_t)portMAX_DELAY))
+        int len = uart_read_bytes(UART_PORT_2, dtmp, BUFF_SIZE, PACKET_READ_TICS);
+        if (len > 0)
         {
-            bzero(dtmp, BUFF_SIZE);
-            uart_read_bytes(UART_PORT_2, dtmp, event.size, portMAX_DELAY);
-
             // Tính toán CRC16 cho dữ liệu gốc
-            uint16_t crc_caculated = MODBUS_CRC16(dtmp, event.size - 2);
-            uint16_t crc_received = combine_2Bytes_unsigned(dtmp[event.size - 1], dtmp[event.size - 2]);
-            if (crc_caculated == crc_received && (event.size > 0))
+            uint16_t crc_caculated = MODBUS_CRC16(dtmp, len - 2);
+            uint16_t crc_received = combine_2Bytes_unsigned(dtmp[len - 1], dtmp[len - 2]);
+            if (crc_caculated == crc_received)
             {
                 // In chuỗi nhận được theo dạng hexa
                 printf("str RX: ");
-                for (int i = 0; i < event.size; i++)
+                for (int i = 0; i < len; i++)
                 {
                     printf("%02X ", dtmp[i]);
                 }
@@ -220,13 +215,19 @@ void RX_task(void *pvParameters)
                 ESP_LOGI(TAG, "Slave address: %02X", dtmp[0]);
                 if (dtmp[1] == 0x03)
                 {
+                    check_data_flag = 1; // have new data
                     ESP_LOGI(TAG, "Funtion: Read holding registers");
                     ESP_LOGI(TAG, "Byte count: %d", dtmp[2]);
                     read_data_holding_registers(dtmp);
+
+                    uart_flush(UART_PORT_2);
                 }
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(10));
+        else
+        {
+            ESP_ERROR_CHECK(uart_wait_tx_done(UART_PORT_2, 10));
+        }
     }
 }
 
@@ -345,8 +346,8 @@ static void TX_task(void *pvParameters)
 
 void rs485_start()
 {
-    xTaskCreate(RX_task, "RX_task", RX_TASK_STACK_SIZE * 2, NULL, RX_TASK_PRIO, NULL);
-    xTaskCreate(TX_task, "TX_task", 4096 * 2, NULL, 3, NULL);
+    xTaskCreate(RX_task, "RX_task", RX_TASK_STACK_SIZE * 2, NULL, 31, NULL);
+    xTaskCreate(TX_task, "TX_task", 4096 * 2, NULL, 30, NULL);
 }
 
 /****************************************************************************/

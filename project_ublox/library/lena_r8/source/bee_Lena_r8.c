@@ -7,7 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "driver/uart.h"
-#include "esp_wifi.h"
+#include "esp_mac.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -17,6 +17,11 @@
 #include "bee_Lena_r8.h"
 
 // QueueHandle_t queue_message_response; // queue for task subscribe
+
+extern bool check_data_flag;
+
+static char BEE_TOPIC_SUBSCRIBE[100];
+static char BEE_TOPIC_PUBLISH[100];
 
 static uint8_t u8Mac_address[6] = {0xb8, 0xd6, 0x1a, 0x6b, 0x2d, 0xe8};
 static char mac_address[13];
@@ -81,11 +86,9 @@ static void lena_vPublish_data_rs485()
 
     // Send AT command
     uart_write_bytes(EX_UART_NUM, message_publish, strlen(message_publish));
-    vTaskDelay(pdMS_TO_TICKS(10));
 
     // Send content to publish
     uart_write_bytes(EX_UART_NUM, message_publish_content_for_publish_mqtt_binary_rs485, strlen(message_publish_content_for_publish_mqtt_binary_rs485) + 1);
-    vTaskDelay(pdMS_TO_TICKS(10));
 }
 
 static void mqtt_vPublish_task()
@@ -98,7 +101,11 @@ static void mqtt_vPublish_task()
     {
         if (xTaskGetTickCount() - last_time_publish >= pdMS_TO_TICKS(BEE_TIME_PUBLISH_DATA_RS485))
         {
-            lena_vPublish_data_rs485();
+            if (check_data_flag == 1) // new data
+            {
+                lena_vPublish_data_rs485();
+                check_data_flag = 0; // reset data's status
+            }
             last_time_publish = xTaskGetTickCount();
         }
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -176,8 +183,11 @@ static void mqtt_vSubscribe_command_server_task()
 
 void mqtt_vLena_r8_start()
 {
-    esp_wifi_get_mac(ESP_IF_WIFI_STA, u8Mac_address);
+    // Get mac address
+    esp_efuse_mac_get_default(u8Mac_address);
     snprintf(mac_address, sizeof(mac_address), "%02x%02x%02x%02x%02x%02x", u8Mac_address[0], u8Mac_address[1], u8Mac_address[2], u8Mac_address[3], u8Mac_address[4], u8Mac_address[5]);
+    snprintf(BEE_TOPIC_PUBLISH, sizeof(BEE_TOPIC_PUBLISH), "\"VB/DMP/VBEEON/BEE/SMH/%s/telemetry\"", mac_address);
+    snprintf(BEE_TOPIC_SUBSCRIBE, sizeof(BEE_TOPIC_SUBSCRIBE), "\"VB/DMP/VBEEON/BEE/SMH/%s/command\"", mac_address);
 
     xTaskCreate(mqtt_vPublish_task, "mqtt_vPublish_task", 1024 * 3, NULL, 3, NULL);
 

@@ -16,9 +16,6 @@
 #define OBJECT_TYPE_TEMP "temperature"
 #define OBJECT_TYPE_HUM "humidity"
 
-#define BEE_TOPIC_SUBSCRIBE "\"VB/DMP/VBEEON/BEE/SMH/b8d61a6b2de8/command\""
-#define BEE_TOPIC_PUBLISH "\"VB/DMP/VBEEON/BEE/SMH/b8d61a6b2de8/telemetry\""
-
 #define BEE_TIME_PUBLISH_DATA_RS485 10000
 #define BEE_QUEUE_LENGTH 30
 
