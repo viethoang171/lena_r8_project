@@ -31,6 +31,17 @@ bool check_data_flag = 0;
 /***        Local Functions                                               ***/
 /****************************************************************************/
 
+uint8_t *split_2byte(uint16_t bytes)
+{
+    uint8_t *result = malloc(2 * sizeof(uint8_t));
+    if (result != NULL)
+    {
+        result[0] = (uint8_t)(bytes >> 8);
+        result[1] = (uint8_t)(bytes & 0xFF);
+    }
+    return result;
+}
+
 static uint16_t combine_2Bytes_unsigned(uint8_t highByte, uint8_t lowByte)
 {
     if (highByte == 0xff && lowByte == 0xff)
@@ -38,6 +49,15 @@ static uint16_t combine_2Bytes_unsigned(uint8_t highByte, uint8_t lowByte)
         return 0;
     }
     return ((uint16_t)highByte << 8) | lowByte;
+}
+
+static int16_t combine_2Bytes_signed(uint8_t highByte, uint8_t lowByte)
+{
+    if (highByte == 0x7f && lowByte == 0xff)
+    {
+        return 0;
+    }
+    return ((int16_t)highByte << 8) | lowByte;
 }
 
 static uint32_t combine_4Bytes_unsingned(uint8_t highByte1, uint8_t lowByte1, uint8_t highByte2, uint8_t lowByte2)
@@ -57,6 +77,18 @@ static int32_t combine_4Bytes_singned(uint8_t highByte1, uint8_t lowByte1, uint8
         return 0;
     }
     return result;
+}
+
+static uint64_t combine_8Bytes_unsingned(uint8_t highByte1, uint8_t lowByte1, uint8_t highByte2, uint8_t lowByte2,
+                                         uint8_t highByte3, uint8_t lowByte3, uint8_t highByte4, uint8_t lowByte4)
+{
+    if (highByte1 == 0xff && lowByte1 == 0xff && highByte2 == 0xff && lowByte2 == 0xff &&
+        highByte3 == 0xff && lowByte3 == 0xff && highByte4 == 0xff && lowByte4 == 0xff)
+    {
+        return 0;
+    }
+    return ((uint64_t)highByte1 << 56) | ((uint64_t)lowByte1 << 48) | ((uint64_t)highByte2 << 40) | ((uint64_t)lowByte2 << 32) |
+           ((uint64_t)highByte3 << 24) | ((uint64_t)lowByte3 << 16) | ((uint64_t)highByte4 << 8) | lowByte4;
 }
 
 static uint16_t MODBUS_CRC16(uint8_t *buf, uint16_t len)
@@ -107,7 +139,7 @@ static uint16_t MODBUS_CRC16(uint8_t *buf, uint16_t len)
     return crc;
 }
 
-static void read_data_holding_registers(uint8_t *dtmp_buf)
+static void read_data_holding_reg_ThreePhase_PowerFactors(uint8_t *dtmp_buf)
 {
     data_3pha.voltage3pha = combine_4Bytes_unsingned(dtmp_buf[3], dtmp_buf[4], dtmp_buf[5], dtmp_buf[6]);
     data_3pha.voltageL1 = combine_4Bytes_unsingned(dtmp_buf[7], dtmp_buf[8], dtmp_buf[9], dtmp_buf[10]);
@@ -140,6 +172,20 @@ static void read_data_holding_registers(uint8_t *dtmp_buf)
     data_3pha.aprtpowerL3 = combine_4Bytes_singned(dtmp_buf[99], dtmp_buf[100], dtmp_buf[101], dtmp_buf[102]);
 
     data_3pha.Frequency = combine_2Bytes_unsigned(dtmp_buf[103], dtmp_buf[104]);
+
+    data_3pha.Powerfact3pha = combine_2Bytes_signed(dtmp_buf[131], dtmp_buf[132]);
+    data_3pha.PowerfactL1 = combine_2Bytes_signed(dtmp_buf[133], dtmp_buf[134]);
+    data_3pha.PowerfactL2 = combine_2Bytes_signed(dtmp_buf[135], dtmp_buf[136]);
+    data_3pha.PowerfactL3 = combine_2Bytes_signed(dtmp_buf[137], dtmp_buf[138]);
+}
+
+static void read_data_holding_reg_ActiveEnergy_CO2(uint8_t *dtmp_buf)
+{
+    data_3pha.actenergy = combine_8Bytes_unsingned(dtmp_buf[3], dtmp_buf[4], dtmp_buf[5], dtmp_buf[6], dtmp_buf[7], dtmp_buf[8], dtmp_buf[9], dtmp_buf[10]);
+    data_3pha.ractenergy = combine_8Bytes_unsingned(dtmp_buf[27], dtmp_buf[28], dtmp_buf[29], dtmp_buf[30], dtmp_buf[31], dtmp_buf[32], dtmp_buf[33], dtmp_buf[34]);
+    data_3pha.aprtenergy = combine_8Bytes_unsingned(dtmp_buf[51], dtmp_buf[52], dtmp_buf[53], dtmp_buf[54], dtmp_buf[55], dtmp_buf[56], dtmp_buf[57], dtmp_buf[58]);
+    data_3pha.CO2factor = combine_8Bytes_unsingned(dtmp_buf[75], dtmp_buf[76], dtmp_buf[77], dtmp_buf[78], dtmp_buf[79], dtmp_buf[80], dtmp_buf[81], dtmp_buf[82]);
+    data_3pha.CURfactor = combine_8Bytes_unsingned(dtmp_buf[107], dtmp_buf[108], dtmp_buf[109], dtmp_buf[110], dtmp_buf[111], dtmp_buf[112], dtmp_buf[113], dtmp_buf[114]);
 }
 
 /****************************************************************************/
@@ -197,7 +243,7 @@ void RX_task(void *pvParameters)
     uint8_t *dtmp = (uint8_t *)malloc(BUFF_SIZE);
     for (;;)
     {
-        int len = uart_read_bytes(UART_PORT_2, dtmp, BUFF_SIZE, PACKET_READ_TICS);
+        int len = uart_read_bytes(UART_PORT_2, dtmp, BUFF_SIZE * 2, PACKET_READ_TICS);
         if (len > 0)
         {
             // Tính toán CRC16 cho dữ liệu gốc
@@ -205,23 +251,31 @@ void RX_task(void *pvParameters)
             uint16_t crc_received = combine_2Bytes_unsigned(dtmp[len - 1], dtmp[len - 2]);
             if (crc_caculated == crc_received)
             {
-                // In chuỗi nhận được theo dạng hexa
-                printf("str RX: ");
-                for (int i = 0; i < len; i++)
+                if ((dtmp[1] == 0x03) && (dtmp[2] == 0x88))
                 {
-                    printf("%02X ", dtmp[i]);
+                    check_data_flag = 1;
+                    // printf("str RX: ");
+                    //  for (int i = 0; i < len; i++)
+                    //  {
+                    //      printf("%02X ", dtmp[i]);
+                    //  }
+                    //  printf("\n");
+                    //  ESP_LOGI(TAG, "Byte count: %d", dtmp[2]);
+                    read_data_holding_reg_ThreePhase_PowerFactors(dtmp);
                 }
-                printf("\n");
-                ESP_LOGI(TAG, "Slave address: %02X", dtmp[0]);
-                if (dtmp[1] == 0x03)
+                else if ((dtmp[1] == 0x03) && (dtmp[2] == 0x70))
                 {
-                    check_data_flag = 1; // have new data
-                    ESP_LOGI(TAG, "Funtion: Read holding registers");
+                    check_data_flag = 1;
+                    // printf("str RX: ");
+                    // for (int i = 0; i < len; i++)
+                    // {
+                    //     printf("%02X ", dtmp[i]);
+                    // }
+                    // printf("\n");
                     ESP_LOGI(TAG, "Byte count: %d", dtmp[2]);
-                    read_data_holding_registers(dtmp);
-
-                    uart_flush(UART_PORT_2);
+                    read_data_holding_reg_ActiveEnergy_CO2(dtmp);
                 }
+                uart_flush(UART_PORT_2);
             }
         }
         else
@@ -231,16 +285,20 @@ void RX_task(void *pvParameters)
     }
 }
 
-char *read_holding_registers(uint8_t slave_addr)
+char *read_holding_registers(uint8_t slave_addr, uint16_t reg_addr, uint16_t num_reg)
 {
     uint8_t tx_str[8];
-
+    uint8_t *reg_addr_split = split_2byte(reg_addr);
+    uint8_t *num_reg_split = split_2byte(num_reg);
     tx_str[0] = slave_addr;
     tx_str[1] = 0x03;
-    tx_str[2] = 0x5b;
-    tx_str[3] = 0x00;
-    tx_str[4] = 0x00;
-    tx_str[5] = 0x33;
+    tx_str[2] = reg_addr_split[0];
+    tx_str[3] = reg_addr_split[1];
+    tx_str[4] = num_reg_split[0];
+    tx_str[5] = num_reg_split[1];
+
+    free(reg_addr_split);
+    free(num_reg_split);
 
     // Tính CRC của chuỗi tx_str.
     uint16_t crc = MODBUS_CRC16(tx_str, 6);
@@ -310,6 +368,17 @@ char *pack_json_3pha_data(void)
 
     cJSON_AddNumberToObject(json_values, "Frequency", data_3pha.Frequency);
 
+    cJSON_AddNumberToObject(json_values, "Powerfact3pha", data_3pha.Powerfact3pha);
+    cJSON_AddNumberToObject(json_values, "PowerfactL1", data_3pha.PowerfactL1);
+    cJSON_AddNumberToObject(json_values, "PowerfactL2", data_3pha.PowerfactL2);
+    cJSON_AddNumberToObject(json_values, "PowerfactL3", data_3pha.PowerfactL3);
+
+    cJSON_AddNumberToObject(json_values, "actenergy", data_3pha.actenergy);
+    cJSON_AddNumberToObject(json_values, "ractenergy", data_3pha.ractenergy);
+    cJSON_AddNumberToObject(json_values, "aprtenergy", data_3pha.aprtenergy);
+    cJSON_AddNumberToObject(json_values, "CO2factor", data_3pha.CO2factor);
+    cJSON_AddNumberToObject(json_values, "CURfactor", data_3pha.CURfactor);
+
     cJSON_AddNumberToObject(json_3pha_data, "trans_code", trans_code++);
 
     char *json_str = cJSON_Print(json_3pha_data);
@@ -322,24 +391,31 @@ char *pack_json_3pha_data(void)
 
 static void TX_task(void *pvParameters)
 {
-    static TickType_t last_time_transmit = 0;
-    char *str_tx = read_holding_registers(0x01);
+    char *str_tx_1 = read_holding_registers(0x01, 0x5000, 56);
+    char *str_tx_2 = read_holding_registers(0x01, 0x5b00, 68);
+
     for (;;)
     {
-        if (xTaskGetTickCount() - last_time_transmit > pdMS_TO_TICKS(BEE_TIME_TRANSMIT_DATA_RS485))
+        if (str_tx_1 != NULL && str_tx_2 != NULL)
         {
-            if (str_tx != NULL)
-            {
-                printf("str TX: ");
-                for (int i = 0; i < 8; i++)
-                {
-                    printf("%02X ", (unsigned char)str_tx[i]);
-                }
-                printf("\n");
-                TX(2, str_tx, 8);
-            }
-            last_time_transmit = xTaskGetTickCount();
-            vTaskDelay(pdMS_TO_TICKS(10));
+            // printf("str TX_1: ");
+            // for (int i = 0; i < 8; i++)
+            // {
+            //     printf("%02X ", (unsigned char)str_tx_1[i]);
+            // }
+            // printf("\n");
+
+            // printf("str TX_2: ");
+            // for (int j = 0; j < 8; j++)
+            // {
+            //     printf("%02X ", (unsigned char)str_tx_2[j]);
+            // }
+            // printf("\n");
+
+            TX(2, str_tx_1, 8);
+            vTaskDelay(pdMS_TO_TICKS(400)); // phải có delay giữa 2Tx để tránh bị dính chuỗi
+            TX(2, str_tx_2, 8);
+            vTaskDelay(pdMS_TO_TICKS(4000));
         }
     }
 }

@@ -28,6 +28,7 @@ static uint8_t u8Mac_address[6] = {0xb8, 0xd6, 0x1a, 0x6b, 0x2d, 0xe8};
 static char mac_address[13];
 
 static char message_publish[BEE_LENGTH_AT_COMMAND];
+static char message_response[BEE_LENGTH_MESSAGE_RESPONSE];
 // static char message_publish_content_for_publish_mqtt_binary[BEE_LENGTH_AT_COMMAND];
 static char message_publish_content_for_publish_mqtt_binary_rs485[BEE_LENGTH_AT_COMMAND_RS485];
 static char message_publish_content_for_publish_mqtt_binary_keep_alive[BEE_LENGTH_AT_COMMAND];
@@ -35,6 +36,13 @@ static char message_publish_content_for_publish_mqtt_binary_keep_alive[BEE_LENGT
 static void lena_vConfigure_credential()
 {
     char command_AT[BEE_LENGTH_AT_COMMAND] = {};
+
+    // Query MQTT's credentials
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTT?\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    printf("Response Connect: %s\n", message_response);
+    vTaskDelay(pdMS_TO_TICKS(5000));
 
     // config client Id
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTT=0,%s\r\n", BEE_MQTT_CLIENT_ID);
@@ -59,21 +67,29 @@ static void lena_vConnect_mqtt_broker()
     // Query MQTT's credentials
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTT?\r\n");
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    printf("Response Connect: %s\n", message_response);
     vTaskDelay(pdMS_TO_TICKS(5000));
 
     // CGACT
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGACT=1,1\r\n");
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    printf("Response Connect: %s\n", message_response);
     vTaskDelay(pdMS_TO_TICKS(2000));
 
     // AT connect
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTTC=1\r\n");
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    printf("Response Connect: %s\n", message_response);
     vTaskDelay(pdMS_TO_TICKS(5000));
 
     // create AT command to subscribe topic on broker
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTTC=4,0,%s\r\n", BEE_TOPIC_SUBSCRIBE);
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    printf("Response Connect: %s\n", message_response);
     vTaskDelay(pdMS_TO_TICKS(2000));
 }
 
@@ -88,9 +104,13 @@ static void lena_vPublish_data_rs485()
 
     // Send AT command
     uart_write_bytes(EX_UART_NUM, message_publish, strlen(message_publish));
+    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    printf("Response AT 485: %s\n", message_response);
 
     // Send content to publish
     uart_write_bytes(EX_UART_NUM, message_publish_content_for_publish_mqtt_binary_rs485, strlen(message_publish_content_for_publish_mqtt_binary_rs485) + 1);
+    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    printf("Response content 485: %s\n", message_response);
 }
 
 static char *cCreate_message_json_keep_alive()
@@ -102,7 +122,7 @@ static char *cCreate_message_json_keep_alive()
     cJSON_AddItemToObject(json_keep_alive, "values", values = cJSON_CreateObject());
     cJSON_AddItemToObject(values, "eventType", cJSON_CreateString("refresh"));
     cJSON_AddItemToObject(values, "status", cJSON_CreateString("ONLINE"));
-    cJSON_AddItemToObject(json_keep_alive, "trans_code", cJSON_CreateNumber(trans_code));
+    cJSON_AddItemToObject(json_keep_alive, "trans_code", cJSON_CreateNumber(trans_code++));
     char *message_keep_alive_json = cJSON_Print(json_keep_alive);
     cJSON_Delete(json_keep_alive);
 
@@ -120,9 +140,13 @@ static void lena_vPublish_keep_alive()
 
     // Send AT command
     uart_write_bytes(EX_UART_NUM, message_publish, strlen(message_publish));
+    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    printf("Response AT keep alive: %s\n", message_response);
 
     // Send content to publish
     uart_write_bytes(EX_UART_NUM, message_publish_content_for_publish_mqtt_binary_keep_alive, strlen(message_publish_content_for_publish_mqtt_binary_keep_alive) + 1);
+    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    printf("Response content keep alive: %s\n", message_response);
 }
 
 static void mqtt_vPublish_task()

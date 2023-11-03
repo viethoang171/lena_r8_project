@@ -23,7 +23,7 @@
 // CTS is not used in RS485 Half-Duplex Mode
 #define CTS_PIN (UART_PIN_NO_CHANGE)
 
-#define BUFF_SIZE (128)
+#define BUFF_SIZE (256)
 #define BAUD_RATE (9600)
 
 // Read packet timeout
@@ -76,6 +76,17 @@ typedef struct
     int32_t aprtpowerL3;
 
     uint16_t Frequency;
+
+    int16_t Powerfact3pha;
+    int16_t PowerfactL1;
+    int16_t PowerfactL2;
+    int16_t PowerfactL3;
+
+    uint64_t actenergy;
+    uint64_t ractenergy;
+    uint64_t aprtenergy;
+    uint64_t CO2factor;
+    uint64_t CURfactor;
 } data_3pha_t;
 
 /****************************************************************************/
@@ -128,7 +139,7 @@ void TX(const int port, const char *str, uint8_t length);
  *         The caller is responsible for freeing the memory when done using it.
  *         Returns NULL if memory allocation fails.
  */
-char *read_holding_registers(uint8_t slave_addr);
+char *read_holding_registers(uint8_t slave_addr, uint16_t reg_addr, uint16_t num_reg);
 
 /**
  * @brief Create a JSON representation of 3-phase data and associated metadata.
