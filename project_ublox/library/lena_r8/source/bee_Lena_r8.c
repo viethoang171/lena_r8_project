@@ -7,6 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "driver/uart.h"
+#include "esp_system.h"
 #include "esp_mac.h"
 #include <stdio.h>
 #include <string.h>
@@ -24,6 +25,8 @@ extern uint8_t trans_code;
 static char BEE_TOPIC_SUBSCRIBE[100];
 static char BEE_TOPIC_PUBLISH[100];
 
+static uint8_t u8Connect_fail = 0;
+
 static uint8_t u8Mac_address[6] = {0xb8, 0xd6, 0x1a, 0x6b, 0x2d, 0xe8};
 static char mac_address[13];
 
@@ -37,12 +40,10 @@ static void lena_vConfigure_credential()
 {
     char command_AT[BEE_LENGTH_AT_COMMAND] = {};
 
-    // Query MQTT's credentials
-    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTT?\r\n");
+    // config client Id
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTT=0,%s\r\n", BEE_MQTT_CLIENT_ID);
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    printf("Response Connect: %s\n", message_response);
-    vTaskDelay(pdMS_TO_TICKS(5000));
+    vTaskDelay(pdMS_TO_TICKS(2000));
 
     // config client Id
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTT=0,%s\r\n", BEE_MQTT_CLIENT_ID);
@@ -67,34 +68,36 @@ static void lena_vConnect_mqtt_broker()
     // Query MQTT's credentials
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTT?\r\n");
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    printf("Response Connect: %s\n", message_response);
+    // uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    // printf("Response Connect: %s\n", message_response);
     vTaskDelay(pdMS_TO_TICKS(5000));
 
     // CGACT
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGACT=1,1\r\n");
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    printf("Response Connect: %s\n", message_response);
+    // uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    // printf("Response Connect: %s\n", message_response);
     vTaskDelay(pdMS_TO_TICKS(2000));
 
     // AT connect
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTTC=1\r\n");
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    printf("Response Connect: %s\n", message_response);
+    // uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    // printf("Response Connect: %s\n", message_response);
     vTaskDelay(pdMS_TO_TICKS(5000));
 
     // create AT command to subscribe topic on broker
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTTC=4,0,%s\r\n", BEE_TOPIC_SUBSCRIBE);
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    printf("Response Connect: %s\n", message_response);
+    // uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    // printf("Response Connect: %s\n", message_response);
     vTaskDelay(pdMS_TO_TICKS(2000));
 }
 
 static void lena_vPublish_data_rs485()
 {
+    char *find_error;
+
     // Create AT command to publish json message rs485
     char *message_json_rs485 = (char *)calloc(BEE_LENGTH_AT_COMMAND_RS485, sizeof(char));
     message_json_rs485 = pack_json_3pha_data();
@@ -105,12 +108,26 @@ static void lena_vPublish_data_rs485()
     // Send AT command
     uart_write_bytes(EX_UART_NUM, message_publish, strlen(message_publish));
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    printf("Response AT 485: %s\n", message_response);
+    find_error = strstr(message_response, "invalid command");
+    if (find_error != NULL)
+    {
+        u8Connect_fail++;
+    }
 
     // Send content to publish
     uart_write_bytes(EX_UART_NUM, message_publish_content_for_publish_mqtt_binary_rs485, strlen(message_publish_content_for_publish_mqtt_binary_rs485) + 1);
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    printf("Response content 485: %s\n", message_response);
+    find_error = strstr(message_response, "invalid command");
+    if (find_error != NULL)
+    {
+        u8Connect_fail++;
+    }
+
+    // reset if LENA-R8 can't connect broker
+    if (u8Connect_fail >= BEE_COUNT_MAX_CONNECTED_FAIL)
+    {
+        esp_restart();
+    }
 }
 
 static char *cCreate_message_json_keep_alive()
@@ -140,13 +157,13 @@ static void lena_vPublish_keep_alive()
 
     // Send AT command
     uart_write_bytes(EX_UART_NUM, message_publish, strlen(message_publish));
-    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    printf("Response AT keep alive: %s\n", message_response);
+    // uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    // printf("Response AT keep alive: %s\n", message_response);
 
     // Send content to publish
     uart_write_bytes(EX_UART_NUM, message_publish_content_for_publish_mqtt_binary_keep_alive, strlen(message_publish_content_for_publish_mqtt_binary_keep_alive) + 1);
-    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    printf("Response content keep alive: %s\n", message_response);
+    // uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    // printf("Response content keep alive: %s\n", message_response);
 }
 
 static void mqtt_vPublish_task()
