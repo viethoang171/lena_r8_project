@@ -25,6 +25,8 @@ extern uint8_t trans_code;
 static char BEE_TOPIC_SUBSCRIBE[100];
 static char BEE_TOPIC_PUBLISH[100];
 
+static bool flag_connect_fail = 0;
+
 static uint8_t u8Connect_fail = 0;
 
 static uint8_t u8Mac_address[6] = {0xb8, 0xd6, 0x1a, 0x6b, 0x2d, 0xe8};
@@ -126,7 +128,8 @@ static void lena_vPublish_data_rs485()
     // reset if LENA-R8 can't connect broker
     if (u8Connect_fail >= BEE_COUNT_MAX_CONNECTED_FAIL)
     {
-        esp_restart();
+        flag_connect_fail = 1;
+        mqtt_vLena_r8_start();
     }
 }
 
@@ -170,8 +173,6 @@ static void mqtt_vPublish_task()
 {
     static TickType_t last_time_publish = 0;
     static TickType_t last_time_keep_alive = 0;
-    lena_vConfigure_credential();
-    lena_vConnect_mqtt_broker();
 
     for (;;)
     {
@@ -270,7 +271,12 @@ void mqtt_vLena_r8_start()
     snprintf(BEE_TOPIC_PUBLISH, sizeof(BEE_TOPIC_PUBLISH), "\"VB/DMP/VBEEON/BEE/SMH/%s/telemetry\"", mac_address);
     snprintf(BEE_TOPIC_SUBSCRIBE, sizeof(BEE_TOPIC_SUBSCRIBE), "\"VB/DMP/VBEEON/BEE/SMH/%s/command\"", mac_address);
 
-    xTaskCreate(mqtt_vPublish_task, "mqtt_vPublish_task", 1024 * 3, NULL, 3, NULL);
+    // config credential and connect broker
+    lena_vConfigure_credential();
+    lena_vConnect_mqtt_broker();
+
+    if (flag_connect_fail == 0)
+        xTaskCreate(mqtt_vPublish_task, "mqtt_vPublish_task", 1024 * 3, NULL, 3, NULL);
 
     // xTaskCreate(mqtt_vSubscribe_command_server_task, "mqtt_vSubscribe_command_server_task", 1024 * 3, NULL, 4, NULL);
 }
