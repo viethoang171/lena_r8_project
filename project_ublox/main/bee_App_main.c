@@ -5,7 +5,6 @@
  * @brief app_main for ublox project
  */
 #include "bee_Uart.h"
-#include "bee_Lena_r8.h"
 #include "bee_rs485.h"
 #include "bee_Button.h"
 #include "bee_Pairing_ble.h"

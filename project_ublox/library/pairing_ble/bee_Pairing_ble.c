@@ -10,7 +10,7 @@
 #include <esp_log.h>
 #include <esp_wifi.h>
 #include <esp_event.h>
-#include <nvs_flash.h>
+// #include <nvs_flash.h>
 #include <string.h>
 
 #include <wifi_provisioning/manager.h>
@@ -83,34 +83,10 @@ static void event_handler(void *arg, esp_event_base_t event_base,
     {
         switch (event_id)
         {
-        case WIFI_PROV_START:
-            ESP_LOGI(TAG, "Provisioning started");
-            break;
         case WIFI_PROV_CRED_RECV:
         {
-            wifi_sta_config_t *wifi_sta_cfg = (wifi_sta_config_t *)event_data;
-            ESP_LOGI(TAG, "Received Wi-Fi credentials"
-                          "\n\tSSID     : %s\n\tPassword : %s",
-                     (const char *)wifi_sta_cfg->ssid,
-                     (const char *)wifi_sta_cfg->password);
             break;
         }
-        case WIFI_PROV_CRED_FAIL:
-        {
-            config_error = true;
-            wifi_prov_sta_fail_reason_t *reason = (wifi_prov_sta_fail_reason_t *)event_data;
-            ESP_LOGE(TAG, "Provisioning failed!\n\tReason : %s"
-                          "\n\tPlease reset to factory and retry provisioning",
-                     (*reason == WIFI_PROV_STA_AUTH_ERROR) ? "Wi-Fi station authentication failed" : "Wi-Fi access-point not found");
-
-            break;
-        }
-        case WIFI_PROV_CRED_SUCCESS:
-        {
-            config_error = false;
-            ESP_LOGI(TAG, "Provisioning successful");
-        }
-        break;
         case WIFI_PROV_END:
             /* De-initialize manager once provisioning is finished */
             mqtt_vLena_r8_start();
@@ -124,18 +100,6 @@ static void event_handler(void *arg, esp_event_base_t event_base,
 
 static void vRetry_smart_config_task()
 {
-    /* Initialize NVS partition */
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
-        /* NVS partition was truncated
-         * and needs to be erased */
-        ESP_ERROR_CHECK(nvs_flash_erase());
-
-        /* Retry nvs_flash_init */
-        ESP_ERROR_CHECK(nvs_flash_init());
-    }
-
     /* Initialize TCP/IP */
     ESP_ERROR_CHECK(esp_netif_init());
 
@@ -144,12 +108,8 @@ static void vRetry_smart_config_task()
 
     /* Register our event handler for Wi-Fi, IP and Provisioning related events */
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_PROV_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(PROTOCOMM_TRANSPORT_BLE_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
 
     /* Initialize Wi-Fi including netif with default config */
-    esp_netif_create_default_wifi_sta();
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
@@ -280,7 +240,6 @@ void wifi_vRetrySmartConfig()
     {
         xTaskCreate(vRetry_smart_config_task, "vRetry_smart_config_task", 4096, NULL, 8, &xHandle);
     }
-
     else
     {
         vTaskResume(xHandle);
