@@ -109,6 +109,7 @@ static void lena_vPublish_data_rs485()
 
     // Send AT command
     uart_write_bytes(EX_UART_NUM, message_publish, strlen(message_publish));
+    // printf("%s\n", message_publish);
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
     find_error = strstr(message_response, "invalid command");
     if (find_error != NULL)
@@ -118,6 +119,7 @@ static void lena_vPublish_data_rs485()
 
     // Send content to publish
     uart_write_bytes(EX_UART_NUM, message_publish_content_for_publish_mqtt_binary_rs485, strlen(message_publish_content_for_publish_mqtt_binary_rs485) + 1);
+    // printf("%s\n", message_publish_content_for_publish_mqtt_binary_rs485);
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
     find_error = strstr(message_response, "invalid command");
     if (find_error != NULL)
@@ -129,6 +131,7 @@ static void lena_vPublish_data_rs485()
     if (u8Connect_fail >= BEE_COUNT_MAX_CONNECTED_FAIL)
     {
         flag_connect_fail = 1;
+        u8Connect_fail = 0;
         mqtt_vLena_r8_start();
     }
 }
@@ -181,6 +184,7 @@ static void mqtt_vPublish_task()
             if (check_data_flag == 1) // new data
             {
                 lena_vPublish_data_rs485();
+                u8Connect_fail++;
                 check_data_flag = 0; // reset data's status
             }
             last_time_publish = xTaskGetTickCount();

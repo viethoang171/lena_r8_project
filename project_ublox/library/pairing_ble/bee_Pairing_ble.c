@@ -10,14 +10,15 @@
 #include <esp_log.h>
 #include <esp_wifi.h>
 #include <esp_event.h>
-// #include <nvs_flash.h>
 #include <string.h>
+#include <nvs_flash.h>
 
 #include <wifi_provisioning/manager.h>
 
 #include <wifi_provisioning/scheme_ble.h>
 
 #include "bee_Lena_r8.h"
+#include "bee_FLash.h"
 #include "bee_Pairing_ble.h"
 
 static const char *TAG = "app";
@@ -25,6 +26,10 @@ static TickType_t last_time_time_out_config;
 static TaskHandle_t xHandle;
 static bool config_error = false;
 static int retries = 0;
+
+extern esp_err_t flag_config_flash;
+extern nvs_handle_t my_handle_flash;
+extern uint8_t u8Flag_config;
 
 /* Handler for the optional provisioning endpoint registered by the application.
  * The data format can be chosen by applications. Here, we are using plain ascii text.
@@ -89,6 +94,9 @@ static void event_handler(void *arg, esp_event_base_t event_base,
         }
         case WIFI_PROV_END:
             /* De-initialize manager once provisioning is finished */
+            flash_vFlashOpen(&flag_config_flash, &my_handle_flash);
+            u8Flag_config = 1;
+            flash_u8FlashWriteU8(&flag_config_flash, &my_handle_flash, &u8Flag_config);
             mqtt_vLena_r8_start();
             wifi_prov_mgr_stop_provisioning();
             break;
@@ -239,7 +247,7 @@ void wifi_vRetrySmartConfig()
     if (retries == 1)
     {
         xTaskCreate(vRetry_smart_config_task, "vRetry_smart_config_task", 4096, NULL, 8, &xHandle);
-    }
+        }
     else
     {
         vTaskResume(xHandle);
