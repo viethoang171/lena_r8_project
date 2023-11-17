@@ -247,7 +247,7 @@ void wifi_vRetrySmartConfig()
     if (retries == 1)
     {
         xTaskCreate(vRetry_smart_config_task, "vRetry_smart_config_task", 4096, NULL, 8, &xHandle);
-        }
+    }
     else
     {
         vTaskResume(xHandle);

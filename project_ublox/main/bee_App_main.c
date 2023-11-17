@@ -29,21 +29,22 @@ static void button_vEventCallback(uint8_t pin)
 
 void app_main()
 {
-    flash_vFlashInit(&flag_config_flash);
+    // flash_vFlashInit(&flag_config_flash);
 
-    button_vCreateInput(BUTTON_ADVERTISE_BLE, HIGH_TO_LOW);
-    button_vSetCallback(button_vEventCallback);
+    // button_vCreateInput(BUTTON_ADVERTISE_BLE, HIGH_TO_LOW);
+    // button_vSetCallback(button_vEventCallback);
 
-    flash_vFlashOpen(&flag_config_flash, &my_handle_flash);
-    if (flash_u8FlashReadU8(&flag_config_flash, &my_handle_flash, &u8Flag_config) == 1)
-    {
-        printf("%d\n", u8Flag_config);
-        mqtt_vLena_r8_start();
-    }
+    // flash_vFlashOpen(&flag_config_flash, &my_handle_flash);
+    // if (flash_u8FlashReadU8(&flag_config_flash, &my_handle_flash, &u8Flag_config) == 1)
+    // {
+    //     printf("%d\n", u8Flag_config);
+    //     mqtt_vLena_r8_start();
+    // }
 
     uart_vCreate();
     rs485_init();
     rs485_start();
+    mqtt_vLena_r8_start();
 }
 
 /****************************************************************************/

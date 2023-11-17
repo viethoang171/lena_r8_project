@@ -61,3 +61,6 @@ uint8_t flash_u8FlashWriteU8(esp_err_t *pErr, nvs_handle_t *p_myHandle, uint8_t 
     nvs_close(&p_myHandle);
     return u8GiaTri;
 }
+/****************************************************************************/
+/***        END OF FILE                                                   ***/
+/****************************************************************************/
