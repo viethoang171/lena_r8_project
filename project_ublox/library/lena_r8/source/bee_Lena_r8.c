@@ -185,14 +185,29 @@ static void mqtt_vPublish_task()
 {
     static TickType_t last_time_publish = 0;
     static TickType_t last_time_keep_alive = 0;
+    static TickType_t last_time_blink_green_led = 0;
+    static uint8_t flag_turn_on_green_led = 0;
 
     for (;;)
     {
+        if (xTaskGetTickCount() - last_time_publish >= pdMS_TO_TICKS(BEE_TIME_BLINK_GREEN_LED) && flag_turn_on_green_led == 1)
+        {
+            // confirm disconnect broker through led
+            led_vSetLevel(LED_RED, LOW_LEVEL);
+            led_vSetLevel(LED_GREEN, HIGH_LEVEL);
+            led_vSetLevel(LED_BLUE, LOW_LEVEL);
+            flag_turn_on_green_led = 0;
+            last_time_blink_green_led = xTaskGetTickCount();
+        }
         if (xTaskGetTickCount() - last_time_publish >= pdMS_TO_TICKS(BEE_TIME_PUBLISH_DATA_RS485))
         {
             if (check_data_flag == 1) // new data
             {
                 lena_vPublish_data_rs485();
+
+                // green led turn on - published
+                flag_turn_on_green_led = 1;
+
                 u8Connect_fail++;
                 check_data_flag = 0; // reset data's status
             }
