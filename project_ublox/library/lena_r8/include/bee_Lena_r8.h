@@ -24,6 +24,9 @@
 #define TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE 10
 #define BEE_COUNT_MAX_CONNECTED_FAIL 20
 
+#define MODULE_SIM_OK 0
+#define MODULE_SIM_CANT_CONNECT_NET 1
+
 void mqtt_vLena_r8_start();
 
 #endif

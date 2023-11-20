@@ -11,10 +11,12 @@
 #include "esp_mac.h"
 #include <stdio.h>
 #include <string.h>
+#include "esp_log.h"
 
 #include "bee_cJSON.h"
 #include "bee_Uart.h"
 #include "bee_rs485.h"
+#include "bee_Led.h"
 #include "bee_Lena_r8.h"
 
 // QueueHandle_t queue_message_response; // queue for task subscribe
@@ -65,29 +67,35 @@ static void lena_vConnect_mqtt_broker()
     // Query MQTT's credentials
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTT?\r\n");
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    printf("Query: %s\n", message_response);
+    // uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    // printf("Query: %s\n", message_response);
     vTaskDelay(pdMS_TO_TICKS(5000));
 
     // CGACT
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGACT=1,1\r\n");
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    printf("CGACT: %s\n", message_response);
+    // uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    // printf("CGACT: %s\n", message_response);
     vTaskDelay(pdMS_TO_TICKS(2000));
 
     // AT connect
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTTC=1\r\n");
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+
+    // confirm connect broker through led
+    led_vSetLevel(LED_RED, LOW_LEVEL);
+    led_vSetLevel(LED_GREEN, LOW_LEVEL);
+    led_vSetLevel(LED_BLUE, HIGH_LEVEL);
+
     printf("AT connect: %s\n", message_response);
     vTaskDelay(pdMS_TO_TICKS(5000));
 
     // create AT command to subscribe topic on broker
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTTC=4,0,%s\r\n", BEE_TOPIC_SUBSCRIBE);
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    printf("AT subscribe: %s\n", message_response);
+    // uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    // printf("AT subscribe: %s\n", message_response);
     vTaskDelay(pdMS_TO_TICKS(2000));
 }
 
@@ -127,6 +135,12 @@ static void lena_vPublish_data_rs485()
     {
         flag_connect_fail = 1;
         u8Connect_fail = 0;
+
+        // confirm disconnect broker through led
+        led_vSetLevel(LED_RED, HIGH_LEVEL);
+        led_vSetLevel(LED_GREEN, LOW_LEVEL);
+        led_vSetLevel(LED_BLUE, LOW_LEVEL);
+
         mqtt_vLena_r8_start();
     }
 }
@@ -262,6 +276,105 @@ static void mqtt_vSubscribe_command_server_task()
 }
 #endif
 
+bool checkRegistration(char *response)
+{
+    // Tìm vị trí của dấu phẩy thứ hai trong chuỗi
+    char *secondComma = strchr(response, ',');
+    if (secondComma != NULL)
+    {
+        // Tìm vị trí của dấu phẩy tiếp theo
+        char *thirdComma = strchr(secondComma + 1, ',');
+
+        if (thirdComma != NULL)
+        {
+            // Tạo một chuỗi con từ vị trí sau dấu phẩy thứ hai đến trước dấu phẩy thứ ba
+            char subString[250];
+            strncpy(subString, secondComma + 1, thirdComma - secondComma - 1);
+            subString[thirdComma - secondComma - 1] = '\0';
+
+            // Kiểm tra xem "1" hoặc "5" có xuất hiện trong chuỗi con hay không
+            if (strchr(subString, '1') != NULL || strchr(subString, '5') != NULL)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool reg = false;
+void check_module_sim()
+{
+
+    char command_AT[BEE_LENGTH_AT_COMMAND] = {};
+
+    //// URCs initialization
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CMEE=2\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CREG=2\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGREG=2\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CEREG=2\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGEREP=2,1\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CSCON=1\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CFUN=1\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+    vTaskDelay(pdMS_TO_TICKS(5000));
+
+    // Collect module status
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UPSV?\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CPIN?\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CCLK?\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGDCONT?\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    // Check registration
+    vTaskDelay(pdMS_TO_TICKS(2000));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CEREG?\r\n");
+    uart_flush(EX_UART_NUM);
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)300);
+    printf("CEREG: %s\n", message_response);
+    if (checkRegistration(message_response) == true)
+    {
+        reg = true;
+    }
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGREG?\r\n");
+    uart_flush(EX_UART_NUM);
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)300);
+    printf("CGREG: %s\n", message_response);
+    if (checkRegistration(message_response) == true)
+    {
+        reg = true;
+    }
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+COPS?\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    // additional AT+CGACT command is necessary
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGACT=1\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+}
+
 void mqtt_vLena_r8_start()
 {
     // Get mac address
@@ -270,9 +383,18 @@ void mqtt_vLena_r8_start()
     snprintf(BEE_TOPIC_PUBLISH, sizeof(BEE_TOPIC_PUBLISH), "\"VB/DMP/VBEEON/BEE/SMH/%s/telemetry\"", mac_address);
     snprintf(BEE_TOPIC_SUBSCRIBE, sizeof(BEE_TOPIC_SUBSCRIBE), "\"VB/DMP/VBEEON/BEE/SMH/%s/command\"", mac_address);
 
-    // config credential and connect broker
-    lena_vConfigure_credential();
-    lena_vConnect_mqtt_broker();
+    // confirm disconnect broker through led
+    led_vSetLevel(LED_RED, HIGH_LEVEL);
+    led_vSetLevel(LED_GREEN, LOW_LEVEL);
+    led_vSetLevel(LED_BLUE, LOW_LEVEL);
+
+    check_module_sim();
+    if (reg == true)
+    {
+        // config credential and connect broker
+        lena_vConfigure_credential();
+        lena_vConnect_mqtt_broker();
+    }
 
     if (flag_connect_fail == 0)
         xTaskCreate(mqtt_vPublish_task, "mqtt_vPublish_task", 1024 * 3, NULL, 3, NULL);

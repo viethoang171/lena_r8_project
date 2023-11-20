@@ -4,28 +4,28 @@
  * @date 21 September 2023
  * @brief app_main for ublox project
  */
-#include <nvs_flash.h>
-
+// #include <nvs_flash.h>
+// #include "bee_Button.h"
+// #include "bee_Pairing_ble.h"
+// #include "bee_FLash.h"
 #include "bee_Uart.h"
 #include "bee_rs485.h"
-#include "bee_Button.h"
-#include "bee_Pairing_ble.h"
 #include "bee_Lena_r8.h"
-#include "bee_FLash.h"
+#include "bee_Led.h"
 
-esp_err_t flag_config_flash;
-nvs_handle_t my_handle_flash;
+// esp_err_t flag_config_flash;
+// nvs_handle_t my_handle_flash;
 
-uint8_t u8Flag_config = 0;
+// uint8_t u8Flag_config = 0;
 
-static void button_vEventCallback(uint8_t pin)
-{
+// static void button_vEventCallback(uint8_t pin)
+// {
 
-    if (pin == BUTTON_ADVERTISE_BLE)
-    {
-        wifi_vRetrySmartConfig();
-    }
-}
+//     if (pin == BUTTON_ADVERTISE_BLE)
+//     {
+//         wifi_vRetrySmartConfig();
+//     }
+// }
 
 void app_main()
 {
@@ -40,6 +40,7 @@ void app_main()
     //     printf("%d\n", u8Flag_config);
     //     mqtt_vLena_r8_start();
     // }
+    led_vCreate_status();
 
     uart_vCreate();
     rs485_init();
