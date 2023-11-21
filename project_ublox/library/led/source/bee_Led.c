@@ -24,6 +24,8 @@ void led_vCreate_status()
     led_vCreate(LED_RED);
     led_vCreate(LED_GREEN);
     led_vCreate(LED_BLUE);
+
+    led_vCreate(IO_POWER_ON);
 }
 
 /****************************************************************************/

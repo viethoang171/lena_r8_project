@@ -423,6 +423,9 @@ void mqtt_vLena_r8_start()
     led_vSetLevel(LED_GREEN, LOW_LEVEL);
     led_vSetLevel(LED_BLUE, LOW_LEVEL);
 
+    // supply power for LENA-R8
+    led_vSetLevel(IO_POWER_ON, 1);
+
     check_module_sim();
     if (reg == true)
     {

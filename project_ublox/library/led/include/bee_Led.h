@@ -14,6 +14,8 @@
 #define LED_GREEN GPIO_NUM_25
 #define LED_BLUE GPIO_NUM_32
 
+#define IO_POWER_ON GPIO_NUM_19
+
 #define HIGH_LEVEL 0
 #define LOW_LEVEL 1
 
