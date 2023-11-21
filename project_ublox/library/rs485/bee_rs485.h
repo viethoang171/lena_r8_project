@@ -153,6 +153,7 @@ char *read_holding_registers(uint8_t slave_addr, uint16_t reg_addr, uint16_t num
  *         Returns NULL if memory allocation fails.
  */
 char *pack_json_3pha_data(void);
+// void clear_energy_data(uint8_t slave_addr);
 void rs485_start(void);
 
 #endif

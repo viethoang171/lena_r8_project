@@ -190,14 +190,22 @@ static void mqtt_vPublish_task()
 
     for (;;)
     {
-        if (xTaskGetTickCount() - last_time_publish >= pdMS_TO_TICKS(BEE_TIME_BLINK_GREEN_LED) && flag_turn_on_green_led == 1)
+        if (xTaskGetTickCount() - last_time_blink_green_led >= pdMS_TO_TICKS(BEE_TIME_BLINK_GREEN_LED) && flag_turn_on_green_led == 1)
         {
             // confirm disconnect broker through led
             led_vSetLevel(LED_RED, LOW_LEVEL);
-            led_vSetLevel(LED_GREEN, HIGH_LEVEL);
-            led_vSetLevel(LED_BLUE, LOW_LEVEL);
+            led_vSetLevel(LED_GREEN, LOW_LEVEL);
+            led_vSetLevel(LED_BLUE, HIGH_LEVEL);
+
             flag_turn_on_green_led = 0;
             last_time_blink_green_led = xTaskGetTickCount();
+        }
+        else
+        {
+            // confirm disconnect broker through led
+            led_vSetLevel(LED_RED, LOW_LEVEL);
+            led_vSetLevel(LED_GREEN, LOW_LEVEL);
+            led_vSetLevel(LED_BLUE, LOW_LEVEL);
         }
         if (xTaskGetTickCount() - last_time_publish >= pdMS_TO_TICKS(BEE_TIME_PUBLISH_DATA_RS485))
         {
@@ -389,6 +397,18 @@ void check_module_sim()
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGACT=1\r\n");
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
 }
+// static void reset()
+// {
+//     static TickType_t last_time_reset = 0;
+//     for (;;)
+//     {
+//         if (xTaskGetTickCount() - last_time_reset >= pdMS_TO_TICKS(10000))
+//         {
+//             clear_energy_data(0x01);
+//             last_time_reset = xTaskGetTickCount();
+//         }
+//     }
+// }
 
 void mqtt_vLena_r8_start()
 {
@@ -413,8 +433,8 @@ void mqtt_vLena_r8_start()
 
     if (flag_connect_fail == 0)
         xTaskCreate(mqtt_vPublish_task, "mqtt_vPublish_task", 1024 * 3, NULL, 3, NULL);
-
-    // xTaskCreate(mqtt_vSubscribe_command_server_task, "mqtt_vSubscribe_command_server_task", 1024 * 3, NULL, 4, NULL);
+    // xTaskCreate(reset, "reset", 1024, NULL, 1, NULL);
+    //  xTaskCreate(mqtt_vSubscribe_command_server_task, "mqtt_vSubscribe_command_server_task", 1024 * 3, NULL, 4, NULL);
 }
 /****************************************************************************/
 /***        END OF FILE                                                   ***/

@@ -255,12 +255,12 @@ void RX_task(void *pvParameters)
                 {
                     check_data_flag = 1;
                     // printf("str RX: ");
-                    //  for (int i = 0; i < len; i++)
-                    //  {
-                    //      printf("%02X ", dtmp[i]);
-                    //  }
-                    //  printf("\n");
-                    //  ESP_LOGI(TAG, "Byte count: %d", dtmp[2]);
+                    // for (int i = 0; i < len; i++)
+                    // {
+                    //     printf("%02X ", dtmp[i]);
+                    // }
+                    // printf("\n");
+                    ESP_LOGI(TAG, "Byte count: %d", dtmp[2]);
                     read_data_holding_reg_ThreePhase_PowerFactors(dtmp);
                 }
                 else if ((dtmp[1] == 0x03) && (dtmp[2] == 0x70))
@@ -274,6 +274,15 @@ void RX_task(void *pvParameters)
                     // printf("\n");
                     ESP_LOGI(TAG, "Byte count: %d", dtmp[2]);
                     read_data_holding_reg_ActiveEnergy_CO2(dtmp);
+                }
+                else
+                {
+                    printf("str RX: ");
+                    for (int i = 0; i < len; i++)
+                    {
+                        printf("%02X ", dtmp[i]);
+                    }
+                    printf("\n");
                 }
                 uart_flush(UART_PORT_2);
             }
@@ -388,6 +397,43 @@ char *pack_json_3pha_data(void)
 
     return json_str;
 }
+
+// void clear_energy_data(uint8_t slave_addr)
+// {
+//     uint8_t tx_str[8];
+//     tx_str[0] = slave_addr;
+//     tx_str[1] = 0x06;
+//     tx_str[2] = 0x8f;
+//     tx_str[3] = 0x5a;
+//     tx_str[4] = 0x00;
+//     tx_str[5] = 0x01;
+
+//     // Tính CRC của chuỗi tx_str.
+//     uint16_t crc = MODBUS_CRC16(tx_str, 6);
+
+//     // Thêm CRC vào chuỗi tx_str.
+//     tx_str[6] = crc & 0xFF;        // Byte thấp của CRC
+//     tx_str[7] = (crc >> 8) & 0xFF; // Byte cao của CRC
+
+//     // Sao chép chuỗi tx_str vào một vùng nhớ mới.
+//     char *new_tx_str = (char *)malloc(sizeof(tx_str));
+
+//     if (new_tx_str == NULL)
+//     {
+//         // Xử lý lỗi nếu không thể cấp phát bộ nhớ.
+//     }
+
+//     memcpy(new_tx_str, tx_str, sizeof(tx_str));
+
+//     // printf("str clear_energy_data: ");
+//     // for (int j = 0; j < 8; j++)
+//     // {
+//     //     printf("%02X ", (unsigned char)new_tx_str[j]);
+//     // }
+//     // printf("\n");
+
+//     TX(2, new_tx_str, 8);
+// }
 
 static void TX_task(void *pvParameters)
 {

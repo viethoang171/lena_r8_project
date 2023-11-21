@@ -45,6 +45,7 @@ void app_main()
     uart_vCreate();
     rs485_init();
     rs485_start();
+
     mqtt_vLena_r8_start();
 }
 
