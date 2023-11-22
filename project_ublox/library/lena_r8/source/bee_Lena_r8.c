@@ -12,8 +12,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "esp_log.h"
+#include "cJSON.h"
 
-#include "bee_cJSON.h"
 #include "bee_Uart.h"
 #include "bee_rs485.h"
 #include "bee_Led.h"

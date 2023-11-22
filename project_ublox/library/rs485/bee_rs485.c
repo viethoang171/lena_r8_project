@@ -18,8 +18,8 @@
 #include "esp_log.h"
 #include "sdkconfig.h"
 #include "esp_mac.h"
+#include "cJSON.h"
 
-#include "bee_cJSON.h"
 #include "bee_rs485.h"
 
 #define TAG "RS485"
