@@ -425,6 +425,7 @@ void mqtt_vLena_r8_start()
 
     // supply power for LENA-R8
     led_vSetLevel(IO_POWER_ON, 1);
+    vTaskDelay(pdMS_TO_TICKS(2000));
 
     check_module_sim();
     if (reg == true)
