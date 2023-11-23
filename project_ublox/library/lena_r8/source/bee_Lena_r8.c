@@ -216,7 +216,6 @@ static void mqtt_vPublish_task()
                 // green led turn on - published
                 flag_turn_on_green_led = 1;
 
-                u8Connect_fail++;
                 check_data_flag = 0; // reset data's status
             }
             last_time_publish = xTaskGetTickCount();
