@@ -230,6 +230,10 @@ void rs485_init()
 
 void TX(const int port, const char *str, uint8_t length)
 {
+    printf("strlen: %d, str_tx:", strlen(str));
+    for (uint8_t i = 0; i < 8; i++)
+        printf("%02x", str[i]);
+    printf("\n");
     if (uart_write_bytes(port, str, length) != length)
     {
         ESP_LOGE(TAG, "Send data critical failure.");
@@ -407,7 +411,7 @@ void reset_data(uint8_t slave_addr, const uint8_t *type_data)
     tx_str[7] = (crc >> 8) & 0xFF; // Byte cao của CRC
 
     // Sao chép chuỗi tx_str vào một vùng nhớ mới.
-    char *new_tx_str = (char *)malloc(sizeof(tx_str));
+    char *new_tx_str = (char *)malloc(sizeof(tx_str) + 1);
 
     if (new_tx_str == NULL)
     {
@@ -415,11 +419,10 @@ void reset_data(uint8_t slave_addr, const uint8_t *type_data)
     }
 
     memcpy(new_tx_str, tx_str, sizeof(tx_str));
+    new_tx_str[sizeof(tx_str)] = '\0'; // Đặt ký tự null ở cuối chuỗi.
+
     TX(2, new_tx_str, 8);
-    printf("New string: %s\n", new_tx_str);
-    for (uint8_t i = 0; i < 8; i++)
-        printf("%02x", new_tx_str[i]);
-    printf("\n");
+
     free(new_tx_str);
 }
 
