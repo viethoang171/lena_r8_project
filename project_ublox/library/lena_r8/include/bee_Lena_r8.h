@@ -7,10 +7,9 @@
 #ifndef __LENA_R8_H__
 #define __LENA_R8_H__
 
-// #define BEE_MQTT_BROKER_URL "\"61.28.238.97\""
-#define BEE_MQTT_BROKER_URL "\"test.mosquitto.org\""
-// #define BEE_BROKER_PORT "1993"
-#define BEE_BROKER_PORT "1883"
+#define BEE_MQTT_BROKER_URL "\"61.28.238.97\""
+#define BEE_BROKER_PORT "1993"
+
 #define BEE_USER_NAME "\"VBeeHome\""
 #define BEE_USER_PASSWORD "\"123abcA@!\""
 #define BEE_MQTT_CLIENT_ID "\"device:029f567e-767a-4250-bd7b-6dfa6191f38b\""
