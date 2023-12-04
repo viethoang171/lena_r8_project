@@ -109,7 +109,7 @@ static void lena_vConnect_mqtt_broker()
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
 
     // confirm connect broker through led
-    ESP_LOGD(TAG, "response %s", message_response);
+    ESP_LOGI(TAG, "response %s", message_response);
     if (strstr(message_response, "OK") != NULL)
     {
         led_vSetLevel(LED_RED, LOW_LEVEL);
@@ -118,7 +118,7 @@ static void lena_vConnect_mqtt_broker()
         main_tain_connected = 1;
     }
 
-    ESP_LOGD(TAG, "AT connect: %s", message_response);
+    ESP_LOGI(TAG, "AT connect: %s", message_response);
     vTaskDelay(pdMS_TO_TICKS(5000));
 
     // create AT command to subscribe topic on broker
@@ -171,8 +171,8 @@ static void lena_vPublish_data_rs485()
 
         // reset status connect when retry connect broker
         main_tain_connected = 0;
-        vTaskDelete(xHandle_Publish);
         vTaskDelete(xHandle_Subscribe);
+        vTaskDelete(xHandle_Publish);
         mqtt_vLena_r8_start();
     }
     free(message_json_rs485);
@@ -434,7 +434,7 @@ void check_module_sim()
     uart_flush(EX_UART_NUM);
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)300);
-    printf("CEREG: %s\n", message_response);
+    ESP_LOGI(TAG, "CEREG: %s", message_response);
     if (checkRegistration(message_response) == true)
     {
         reg = true;
@@ -444,7 +444,7 @@ void check_module_sim()
     uart_flush(EX_UART_NUM);
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)300);
-    printf("CGREG: %s\n", message_response);
+    ESP_LOGI(TAG, "CGREG: %s", message_response);
     if (checkRegistration(message_response) == true)
     {
         reg = true;
