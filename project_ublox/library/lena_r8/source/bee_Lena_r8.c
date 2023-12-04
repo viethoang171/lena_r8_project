@@ -488,8 +488,8 @@ void mqtt_vLena_r8_start()
         lena_vConnect_mqtt_broker();
     }
 
-    xTaskCreate(mqtt_vPublish_task, "mqtt_vPublish_task", 1024 * 3, NULL, 3, NULL);
-    xTaskCreate(mqtt_vSubscribe_command_server_task, "mqtt_vSubscribe_command_server_task", 1024 * 3, NULL, 4, NULL);
+    xTaskCreate(mqtt_vPublish_task, "mqtt_vPublish_task", 1024 * 3, NULL, 3, &xHandle_Publish);
+    xTaskCreate(mqtt_vSubscribe_command_server_task, "mqtt_vSubscribe_command_server_task", 1024 * 3, NULL, 4, &xHandle_Subscribe);
 }
 /****************************************************************************/
 /***        END OF FILE                                                   ***/
