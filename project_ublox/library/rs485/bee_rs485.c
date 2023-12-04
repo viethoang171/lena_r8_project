@@ -230,10 +230,10 @@ void rs485_init()
 
 void TX(const int port, const char *str, uint8_t length)
 {
-    printf("strlen: %d, str_tx:", strlen(str));
-    for (uint8_t i = 0; i < 8; i++)
-        printf("%02x", str[i]);
-    printf("\n");
+    // printf("strlen: %d, str_tx:", strlen(str));
+    //  for (uint8_t i = 0; i < 8; i++)
+    //      printf("%02x", str[i]);
+    //  printf("\n");
     if (uart_write_bytes(port, str, length) != length)
     {
         ESP_LOGE(TAG, "Send data critical failure.");
@@ -258,24 +258,12 @@ void RX_task(void *pvParameters)
                 if ((dtmp[1] == 0x03) && (dtmp[2] == 0x88))
                 {
                     check_data_flag = 1;
-                    // printf("str RX: ");
-                    // for (int i = 0; i < len; i++)
-                    // {
-                    //     printf("%02X ", dtmp[i]);
-                    // }
-                    // printf("\n");
                     ESP_LOGI(TAG, "Byte count: %d", dtmp[2]);
                     read_data_holding_reg_ThreePhase_PowerFactors(dtmp);
                 }
                 else if ((dtmp[1] == 0x03) && (dtmp[2] == 0x70))
                 {
                     check_data_flag = 1;
-                    // printf("str RX: ");
-                    // for (int i = 0; i < len; i++)
-                    // {
-                    //     printf("%02X ", dtmp[i]);
-                    // }
-                    // printf("\n");
                     ESP_LOGI(TAG, "Byte count: %d", dtmp[2]);
                     read_data_holding_reg_ActiveEnergy_CO2(dtmp);
                 }
@@ -435,19 +423,6 @@ static void TX_task(void *pvParameters)
     {
         if (str_tx_1 != NULL && str_tx_2 != NULL)
         {
-            // printf("str TX_1: ");
-            // for (int i = 0; i < 8; i++)
-            // {
-            //     printf("%02X ", (unsigned char)str_tx_1[i]);
-            // }
-            // printf("\n");
-
-            // printf("str TX_2: ");
-            // for (int j = 0; j < 8; j++)
-            // {
-            //     printf("%02X ", (unsigned char)str_tx_2[j]);
-            // }
-            // printf("\n");
 
             TX(2, str_tx_1, 8);
             vTaskDelay(pdMS_TO_TICKS(400)); // phải có delay giữa 2Tx để tránh bị dính chuỗi

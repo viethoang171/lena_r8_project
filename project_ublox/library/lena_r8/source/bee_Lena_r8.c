@@ -25,10 +25,14 @@ QueueHandle_t queue_message_response; // queue for task subscribe
 extern bool check_data_flag;
 extern uint8_t trans_code;
 
+static TaskHandle_t xHandle_Publish = NULL;
+static TaskHandle_t xHandle_Subscribe = NULL;
+
+static const char *TAG = "LENA-R8";
+
 static char BEE_TOPIC_SUBSCRIBE[100];
 static char BEE_TOPIC_PUBLISH[100];
 
-static bool flag_connect_fail = 0;
 static bool main_tain_connected = 0;
 
 static uint8_t u8Connect_fail = 0;
@@ -105,7 +109,7 @@ static void lena_vConnect_mqtt_broker()
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
 
     // confirm connect broker through led
-    printf("RESPONSE: %s\n", message_response);
+    ESP_LOGD(TAG, "response %s", message_response);
     if (strstr(message_response, "OK") != NULL)
     {
         led_vSetLevel(LED_RED, LOW_LEVEL);
@@ -114,7 +118,7 @@ static void lena_vConnect_mqtt_broker()
         main_tain_connected = 1;
     }
 
-    printf("AT connect: %s\n", message_response);
+    ESP_LOGD(TAG, "AT connect: %s", message_response);
     vTaskDelay(pdMS_TO_TICKS(5000));
 
     // create AT command to subscribe topic on broker
@@ -158,7 +162,6 @@ static void lena_vPublish_data_rs485()
     // reset if LENA-R8 can't connect broker
     if (u8Connect_fail >= BEE_COUNT_MAX_CONNECTED_FAIL)
     {
-        flag_connect_fail = 1;
         u8Connect_fail = 0;
 
         // confirm disconnect broker through led
@@ -166,6 +169,10 @@ static void lena_vPublish_data_rs485()
         led_vSetLevel(LED_GREEN, LOW_LEVEL);
         led_vSetLevel(LED_BLUE, LOW_LEVEL);
 
+        // reset status connect when retry connect broker
+        main_tain_connected = 0;
+        vTaskDelete(xHandle_Publish);
+        vTaskDelete(xHandle_Subscribe);
         mqtt_vLena_r8_start();
     }
     free(message_json_rs485);
@@ -481,8 +488,7 @@ void mqtt_vLena_r8_start()
         lena_vConnect_mqtt_broker();
     }
 
-    if (flag_connect_fail == 0)
-        xTaskCreate(mqtt_vPublish_task, "mqtt_vPublish_task", 1024 * 3, NULL, 3, NULL);
+    xTaskCreate(mqtt_vPublish_task, "mqtt_vPublish_task", 1024 * 3, NULL, 3, NULL);
     xTaskCreate(mqtt_vSubscribe_command_server_task, "mqtt_vSubscribe_command_server_task", 1024 * 3, NULL, 4, NULL);
 }
 /****************************************************************************/
