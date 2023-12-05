@@ -25,10 +25,12 @@ QueueHandle_t queue_message_response; // queue for task subscribe
 extern bool check_data_flag;
 extern uint8_t trans_code;
 
-static TaskHandle_t xHandle_Publish = NULL;
-static TaskHandle_t xHandle_Subscribe = NULL;
+static bool flag_publish_task = 0;
 
 static const char *TAG = "LENA-R8";
+
+static TaskHandle_t xHandle_Publish = NULL;
+static TaskHandle_t xHandle_Subscribe = NULL;
 
 static char BEE_TOPIC_SUBSCRIBE[100];
 static char BEE_TOPIC_PUBLISH[100];
@@ -39,10 +41,10 @@ static uint8_t u8Connect_fail = 0;
 
 static uint8_t u8Mac_address[6] = {0xb8, 0xd6, 0x1a, 0x6b, 0x2d, 0xe8};
 static char mac_address[13];
+static bool reg = false;
 
 static char message_publish[BEE_LENGTH_AT_COMMAND];
 static char message_response[BEE_LENGTH_MESSAGE_RESPONSE];
-// static char message_publish_content_for_publish_mqtt_binary[BEE_LENGTH_AT_COMMAND];
 static char message_publish_content_for_publish_mqtt_binary_rs485[BEE_LENGTH_AT_COMMAND_RS485];
 static char message_publish_content_for_publish_mqtt_binary_keep_alive[BEE_LENGTH_AT_COMMAND];
 
@@ -105,6 +107,7 @@ static void lena_vConnect_mqtt_broker()
 
     // AT connect
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTTC=1\r\n");
+    uart_flush(EX_UART_NUM);
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
 
@@ -116,6 +119,11 @@ static void lena_vConnect_mqtt_broker()
         led_vSetLevel(LED_GREEN, LOW_LEVEL);
         led_vSetLevel(LED_BLUE, HIGH_LEVEL);
         main_tain_connected = 1;
+    }
+
+    else if (strstr(message_response, "parameters are invalid") != NULL)
+    {
+        esp_restart();
     }
 
     ESP_LOGI(TAG, "AT connect: %s", message_response);
@@ -131,6 +139,7 @@ static void lena_vConnect_mqtt_broker()
 
 static void lena_vPublish_data_rs485()
 {
+    u8Connect_fail++;
     char *find_error;
     // Create AT command to publish json message rs485
     char *message_json_rs485 = (char *)calloc(BEE_LENGTH_AT_COMMAND_RS485, sizeof(char));
@@ -140,16 +149,26 @@ static void lena_vPublish_data_rs485()
     snprintf(message_publish_content_for_publish_mqtt_binary_rs485, BEE_LENGTH_AT_COMMAND_RS485, "%s\r\n", message_json_rs485);
 
     // Send AT command
+    uart_flush(EX_UART_NUM);
     uart_write_bytes(EX_UART_NUM, message_publish, strlen(message_publish));
 
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
     find_error = strstr(message_response, "invalid command");
+
     if (find_error != NULL)
     {
         u8Connect_fail++;
+        ESP_LOGE(TAG, "Fail %s", message_response);
+    }
+    find_error = strstr(message_response, "ERROR");
+    if (find_error != NULL)
+    {
+        u8Connect_fail++;
+        ESP_LOGE(TAG, "Fail %s", message_response);
     }
 
     // Send content to publish
+    uart_flush(EX_UART_NUM);
     uart_write_bytes(EX_UART_NUM, message_publish_content_for_publish_mqtt_binary_rs485, strlen(message_publish_content_for_publish_mqtt_binary_rs485) + 1);
     // printf("%s\n", message_publish_content_for_publish_mqtt_binary_rs485);
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
@@ -157,24 +176,15 @@ static void lena_vPublish_data_rs485()
     if (find_error != NULL)
     {
         u8Connect_fail++;
+        ESP_LOGE(TAG, "Fail %s", message_response);
     }
-
-    // reset if LENA-R8 can't connect broker
-    if (u8Connect_fail >= BEE_COUNT_MAX_CONNECTED_FAIL)
+    find_error = strstr(message_response, "ERROR");
+    if (find_error != NULL)
     {
-        u8Connect_fail = 0;
-
-        // confirm disconnect broker through led
-        led_vSetLevel(LED_RED, HIGH_LEVEL);
-        led_vSetLevel(LED_GREEN, LOW_LEVEL);
-        led_vSetLevel(LED_BLUE, LOW_LEVEL);
-
-        // reset status connect when retry connect broker
-        main_tain_connected = 0;
-        vTaskDelete(xHandle_Subscribe);
-        vTaskDelete(xHandle_Publish);
-        mqtt_vLena_r8_start();
+        u8Connect_fail++;
+        ESP_LOGE(TAG, "Fail %s", message_response);
     }
+
     free(message_json_rs485);
 }
 
@@ -196,6 +206,7 @@ static char *cCreate_message_json_keep_alive()
 
 static void lena_vPublish_keep_alive()
 {
+    char *find_error;
     // Create AT command to publish keep alive
     char *message_json_keep_alive = (char *)calloc(BEE_LENGTH_AT_COMMAND_RS485, sizeof(char));
     message_json_keep_alive = cCreate_message_json_keep_alive();
@@ -204,44 +215,165 @@ static void lena_vPublish_keep_alive()
     snprintf(message_publish_content_for_publish_mqtt_binary_keep_alive, BEE_LENGTH_AT_COMMAND, "%s\r\n", message_json_keep_alive);
 
     // Send AT command
+    uart_flush(EX_UART_NUM);
     uart_write_bytes(EX_UART_NUM, message_publish, strlen(message_publish));
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    // printf("Response AT keep alive: %s\n", message_response);
+
+    find_error = strstr(message_response, "invalid command");
+    if (find_error != NULL)
+    {
+        u8Connect_fail++;
+        ESP_LOGE(TAG, "Fail %s", message_response);
+    }
+    find_error = strstr(message_response, "ERROR");
+    if (find_error != NULL)
+    {
+        u8Connect_fail++;
+        ESP_LOGE(TAG, "Fail %s", message_response);
+    }
 
     // Send content to publish
+    uart_flush(EX_UART_NUM);
     uart_write_bytes(EX_UART_NUM, message_publish_content_for_publish_mqtt_binary_keep_alive, strlen(message_publish_content_for_publish_mqtt_binary_keep_alive) + 1);
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    // printf("Response content keep alive: %s\n", message_response);
+
+    find_error = strstr(message_response, "invalid command");
+    if (find_error != NULL)
+    {
+        u8Connect_fail++;
+        ESP_LOGE(TAG, "Fail %s", message_response);
+    }
+    find_error = strstr(message_response, "ERROR");
+    if (find_error != NULL)
+    {
+        u8Connect_fail++;
+        ESP_LOGE(TAG, "Fail %s", message_response);
+    }
 
     free(message_json_keep_alive);
 }
 
+bool checkRegistration(char *response)
+{
+    // Tìm vị trí của dấu phẩy thứ hai trong chuỗi
+    char *secondComma = strchr(response, ',');
+    if (secondComma != NULL)
+    {
+        // Tìm vị trí của dấu phẩy tiếp theo
+        char *thirdComma = strchr(secondComma + 1, ',');
+
+        if (thirdComma != NULL)
+        {
+            // Tạo một chuỗi con từ vị trí sau dấu phẩy thứ hai đến trước dấu phẩy thứ ba
+            char subString[250];
+            strncpy(subString, secondComma + 1, thirdComma - secondComma - 1);
+            subString[thirdComma - secondComma - 1] = '\0';
+
+            // Kiểm tra xem "1" hoặc "5" có xuất hiện trong chuỗi con hay không
+            if (strchr(subString, '1') != NULL || strchr(subString, '5') != NULL)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void check_module_sim()
+{
+    char command_AT[BEE_LENGTH_AT_COMMAND] = {};
+
+    //// URCs initialization
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CMEE=2\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CREG=2\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGREG=2\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CEREG=2\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGEREP=2,1\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CSCON=1\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CFUN=1\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+    vTaskDelay(pdMS_TO_TICKS(5000));
+
+    // Collect module status
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UPSV?\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CPIN?\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CCLK?\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGDCONT?\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    // Check registration
+    vTaskDelay(pdMS_TO_TICKS(2000));
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CEREG?\r\n");
+    uart_flush(EX_UART_NUM);
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)300);
+    ESP_LOGI(TAG, "CEREG: %s", message_response);
+    if (checkRegistration(message_response) == true)
+    {
+        reg = true;
+    }
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGREG?\r\n");
+    uart_flush(EX_UART_NUM);
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)300);
+    ESP_LOGI(TAG, "CGREG: %s", message_response);
+    if (checkRegistration(message_response) == true)
+    {
+        reg = true;
+    }
+
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+COPS?\r\n");
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+
+    // additional AT+CGACT command is necessary
+    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGACT=1\r\n");
+    uart_flush(EX_UART_NUM);
+    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+}
+
 static void mqtt_vPublish_task()
 {
+    flag_publish_task = 1;
     static TickType_t last_time_publish = 0;
     static TickType_t last_time_keep_alive = 0;
     static TickType_t last_time_blink_green_led = 0;
-    static uint8_t flag_turn_on_green_led = 0;
+    static TickType_t last_time_retry_connect = 0;
     for (;;)
     {
         if (main_tain_connected == 1)
         {
-            if (xTaskGetTickCount() - last_time_blink_green_led >= pdMS_TO_TICKS(BEE_TIME_BLINK_GREEN_LED) && flag_turn_on_green_led == 1)
+            if (xTaskGetTickCount() - last_time_blink_green_led >= pdMS_TO_TICKS(BEE_TIME_BLINK_GREEN_LED))
             {
                 // confirm disconnect broker through led
                 led_vSetLevel(LED_RED, LOW_LEVEL);
                 led_vSetLevel(LED_GREEN, HIGH_LEVEL);
                 led_vSetLevel(LED_BLUE, LOW_LEVEL);
-
-                flag_turn_on_green_led = 0;
                 last_time_blink_green_led = xTaskGetTickCount();
             }
             else
             {
                 // confirm disconnect broker through led
-                led_vSetLevel(LED_RED, LOW_LEVEL);
-                led_vSetLevel(LED_GREEN, LOW_LEVEL);
-                led_vSetLevel(LED_BLUE, LOW_LEVEL);
+                // TODO
             }
             if (xTaskGetTickCount() - last_time_publish >= pdMS_TO_TICKS(BEE_TIME_PUBLISH_DATA_RS485))
             {
@@ -250,24 +382,74 @@ static void mqtt_vPublish_task()
                     lena_vPublish_data_rs485();
                     // confirm disconnect broker through led
                     led_vSetLevel(LED_RED, LOW_LEVEL);
-                    led_vSetLevel(LED_GREEN, HIGH_LEVEL);
+                    led_vSetLevel(LED_GREEN, LOW_LEVEL);
                     led_vSetLevel(LED_BLUE, LOW_LEVEL);
-
-                    // green led turn on - published
-                    flag_turn_on_green_led = 1;
 
                     // u8Connect_fail++;
                     check_data_flag = 0; // reset data's status
                 }
                 last_time_publish = xTaskGetTickCount();
+                last_time_blink_green_led = xTaskGetTickCount();
             }
             if (xTaskGetTickCount() - last_time_keep_alive >= pdMS_TO_TICKS(BEE_TIME_PUBLISH_DATA_KEEP_ALIVE))
             {
                 lena_vPublish_keep_alive();
+                // confirm disconnect broker through led
+                led_vSetLevel(LED_RED, LOW_LEVEL);
+                led_vSetLevel(LED_GREEN, LOW_LEVEL);
+                led_vSetLevel(LED_BLUE, LOW_LEVEL);
+
                 last_time_keep_alive = xTaskGetTickCount();
+                last_time_blink_green_led = xTaskGetTickCount();
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(10));
+        else
+        {
+            if (xTaskGetTickCount() - last_time_retry_connect >= pdMS_TO_TICKS(10000))
+            {
+                last_time_retry_connect = xTaskGetTickCount();
+                u8Connect_fail++;
+            }
+            led_vSetLevel(LED_RED, HIGH_LEVEL);
+            led_vSetLevel(LED_GREEN, LOW_LEVEL);
+            led_vSetLevel(LED_BLUE, LOW_LEVEL);
+        }
+        // reset if LENA-R8 can't connect broker
+        if (u8Connect_fail >= BEE_COUNT_MAX_CONNECTED_FAIL)
+        {
+            ESP_LOGE(TAG, "Reload connect");
+            u8Connect_fail = 0;
+
+            // confirm disconnect broker through led
+            led_vSetLevel(LED_RED, HIGH_LEVEL);
+            led_vSetLevel(LED_GREEN, LOW_LEVEL);
+            led_vSetLevel(LED_BLUE, LOW_LEVEL);
+
+            main_tain_connected = 0;
+            led_vSetLevel(IO_POWER_ON, 0);
+            vTaskDelay(pdMS_TO_TICKS(10000));
+            led_vSetLevel(IO_POWER_ON, 1);
+            reg = false;
+
+            while (reg == false)
+            {
+                check_module_sim();
+            }
+
+            lena_vConfigure_credential();
+
+            lena_vConnect_mqtt_broker();
+
+            // // reset status connect when retry connect broker
+
+            // // vTaskDelete(xHandle_Subscribe);
+            // // vTaskDelete(xHandle_Publish);
+            // // config credential and connect broker
+            // lena_vConfigure_credential();
+            // lena_vConnect_mqtt_broker();
+            // last_time_retry_connect = xTaskGetTickCount();
+        }
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
@@ -360,103 +542,7 @@ static void mqtt_vSubscribe_command_server_task()
     free(dtmp);
     dtmp = NULL;
 }
-bool checkRegistration(char *response)
-{
-    // Tìm vị trí của dấu phẩy thứ hai trong chuỗi
-    char *secondComma = strchr(response, ',');
-    if (secondComma != NULL)
-    {
-        // Tìm vị trí của dấu phẩy tiếp theo
-        char *thirdComma = strchr(secondComma + 1, ',');
 
-        if (thirdComma != NULL)
-        {
-            // Tạo một chuỗi con từ vị trí sau dấu phẩy thứ hai đến trước dấu phẩy thứ ba
-            char subString[250];
-            strncpy(subString, secondComma + 1, thirdComma - secondComma - 1);
-            subString[thirdComma - secondComma - 1] = '\0';
-
-            // Kiểm tra xem "1" hoặc "5" có xuất hiện trong chuỗi con hay không
-            if (strchr(subString, '1') != NULL || strchr(subString, '5') != NULL)
-            {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-bool reg = false;
-void check_module_sim()
-{
-    char command_AT[BEE_LENGTH_AT_COMMAND] = {};
-
-    //// URCs initialization
-    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CMEE=2\r\n");
-    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-
-    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CREG=2\r\n");
-    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-
-    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGREG=2\r\n");
-    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-
-    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CEREG=2\r\n");
-    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-
-    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGEREP=2,1\r\n");
-    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-
-    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CSCON=1\r\n");
-    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-
-    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CFUN=1\r\n");
-    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-    vTaskDelay(pdMS_TO_TICKS(5000));
-
-    // Collect module status
-    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UPSV?\r\n");
-    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-
-    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CPIN?\r\n");
-    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-
-    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CCLK?\r\n");
-    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-
-    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGDCONT?\r\n");
-    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-
-    // Check registration
-    vTaskDelay(pdMS_TO_TICKS(2000));
-
-    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CEREG?\r\n");
-    uart_flush(EX_UART_NUM);
-    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)300);
-    ESP_LOGI(TAG, "CEREG: %s", message_response);
-    if (checkRegistration(message_response) == true)
-    {
-        reg = true;
-    }
-
-    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGREG?\r\n");
-    uart_flush(EX_UART_NUM);
-    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)300);
-    ESP_LOGI(TAG, "CGREG: %s", message_response);
-    if (checkRegistration(message_response) == true)
-    {
-        reg = true;
-    }
-
-    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+COPS?\r\n");
-    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-
-    // additional AT+CGACT command is necessary
-    snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGACT=1\r\n");
-    uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-}
 void mqtt_vLena_r8_start()
 {
     // Get mac address
@@ -477,19 +563,23 @@ void mqtt_vLena_r8_start()
     // Reg led connection status for module sim
     char command_AT[BEE_LENGTH_AT_COMMAND] = {};
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UGPIOC=16,2\r\n");
+    uart_flush(EX_UART_NUM);
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
 
-    check_module_sim();
-
-    if (reg == true)
+    while (reg == false)
     {
-        // config credential and connect broker
-        lena_vConfigure_credential();
-        lena_vConnect_mqtt_broker();
+        check_module_sim();
     }
 
-    xTaskCreate(mqtt_vPublish_task, "mqtt_vPublish_task", 1024 * 3, NULL, 3, &xHandle_Publish);
-    xTaskCreate(mqtt_vSubscribe_command_server_task, "mqtt_vSubscribe_command_server_task", 1024 * 3, NULL, 4, &xHandle_Subscribe);
+    // config credential and connect broker
+    lena_vConfigure_credential();
+    while (main_tain_connected == 0)
+        lena_vConnect_mqtt_broker();
+    if (flag_publish_task == 0)
+    {
+        xTaskCreate(mqtt_vPublish_task, "mqtt_vPublish_task", 1024 * 3, NULL, 3, &xHandle_Publish);
+        xTaskCreate(mqtt_vSubscribe_command_server_task, "mqtt_vSubscribe_command_server_task", 1024 * 3, NULL, 4, &xHandle_Subscribe);
+    }
 }
 /****************************************************************************/
 /***        END OF FILE                                                   ***/

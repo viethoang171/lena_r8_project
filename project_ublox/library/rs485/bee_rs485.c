@@ -258,13 +258,13 @@ void RX_task(void *pvParameters)
                 if ((dtmp[1] == 0x03) && (dtmp[2] == 0x88))
                 {
                     check_data_flag = 1;
-                    ESP_LOGI(TAG, "Byte count: %d", dtmp[2]);
+                    // ESP_LOGI(TAG, "Byte count: %d", dtmp[2]);
                     read_data_holding_reg_ThreePhase_PowerFactors(dtmp);
                 }
                 else if ((dtmp[1] == 0x03) && (dtmp[2] == 0x70))
                 {
                     check_data_flag = 1;
-                    ESP_LOGI(TAG, "Byte count: %d", dtmp[2]);
+                    // ESP_LOGI(TAG, "Byte count: %d", dtmp[2]);
                     read_data_holding_reg_ActiveEnergy_CO2(dtmp);
                 }
                 uart_flush(UART_PORT_2);
