@@ -139,7 +139,6 @@ static void lena_vConnect_mqtt_broker()
 
 static void lena_vPublish_data_rs485()
 {
-    u8Connect_fail++;
     char *find_error;
     // Create AT command to publish json message rs485
     char *message_json_rs485 = (char *)calloc(BEE_LENGTH_AT_COMMAND_RS485, sizeof(char));
