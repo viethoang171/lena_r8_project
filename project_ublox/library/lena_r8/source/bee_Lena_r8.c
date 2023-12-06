@@ -9,7 +9,6 @@
 #include "driver/uart.h"
 #include "esp_system.h"
 #include "esp_mac.h"
-// #include <stdio.h>
 #include <string.h>
 #include "esp_log.h"
 #include "cJSON.h"
@@ -89,15 +88,11 @@ static void lena_vConnect_mqtt_broker()
     // Query MQTT's credentials
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTT?\r\n");
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-    // uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    // printf("Query: %s\n", message_response);
     vTaskDelay(pdMS_TO_TICKS(5000));
 
     // CGACT
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGACT=1,1\r\n");
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-    // uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    // printf("CGACT: %s\n", message_response);
     vTaskDelay(pdMS_TO_TICKS(2000));
 
     // AT connect
@@ -130,10 +125,26 @@ static void lena_vConnect_mqtt_broker()
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
     vTaskDelay(pdMS_TO_TICKS(2000));
 }
+static void mqtt_vCheck_error()
+{
+    char *find_error;
+    find_error = strstr(message_response, "invalid command");
+    if (find_error != NULL)
+    {
+        u8Connect_fail++;
+        ESP_LOGE(TAG, "Fail %s", message_response);
+    }
+    find_error = strstr(message_response, "ERROR");
+    if (find_error != NULL)
+    {
+        u8Connect_fail++;
+        ESP_LOGE(TAG, "Fail %s", message_response);
+    }
+}
 
 static void lena_vPublish_data_rs485()
 {
-    char *find_error;
+
     // Create AT command to publish json message rs485
     char *message_json_rs485 = (char *)calloc(BEE_LENGTH_AT_COMMAND_RS485, sizeof(char));
     message_json_rs485 = pack_json_3pha_data();
@@ -146,36 +157,13 @@ static void lena_vPublish_data_rs485()
     uart_write_bytes(EX_UART_NUM, message_publish, strlen(message_publish));
 
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    find_error = strstr(message_response, "invalid command");
-
-    if (find_error != NULL)
-    {
-        u8Connect_fail++;
-        ESP_LOGE(TAG, "Fail %s", message_response);
-    }
-    find_error = strstr(message_response, "ERROR");
-    if (find_error != NULL)
-    {
-        u8Connect_fail++;
-        ESP_LOGE(TAG, "Fail %s", message_response);
-    }
+    mqtt_vCheck_error();
 
     // Send content to publish
     uart_flush(EX_UART_NUM);
     uart_write_bytes(EX_UART_NUM, message_publish_content_for_publish_mqtt_binary_rs485, strlen(message_publish_content_for_publish_mqtt_binary_rs485) + 1);
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    find_error = strstr(message_response, "invalid command");
-    if (find_error != NULL)
-    {
-        u8Connect_fail++;
-        ESP_LOGE(TAG, "Fail %s", message_response);
-    }
-    find_error = strstr(message_response, "ERROR");
-    if (find_error != NULL)
-    {
-        u8Connect_fail++;
-        ESP_LOGE(TAG, "Fail %s", message_response);
-    }
+    mqtt_vCheck_error();
 
     free(message_json_rs485);
 }
@@ -198,7 +186,6 @@ static char *cCreate_message_json_keep_alive()
 
 static void lena_vPublish_keep_alive()
 {
-    char *find_error;
     // Create AT command to publish keep alive
     char *message_json_keep_alive = (char *)calloc(BEE_LENGTH_AT_COMMAND_RS485, sizeof(char));
     message_json_keep_alive = cCreate_message_json_keep_alive();
@@ -210,37 +197,13 @@ static void lena_vPublish_keep_alive()
     uart_flush(EX_UART_NUM);
     uart_write_bytes(EX_UART_NUM, message_publish, strlen(message_publish));
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-
-    find_error = strstr(message_response, "invalid command");
-    if (find_error != NULL)
-    {
-        u8Connect_fail++;
-        ESP_LOGE(TAG, "Fail %s", message_response);
-    }
-    find_error = strstr(message_response, "ERROR");
-    if (find_error != NULL)
-    {
-        u8Connect_fail++;
-        ESP_LOGE(TAG, "Fail %s", message_response);
-    }
+    mqtt_vCheck_error();
 
     // Send content to publish
     uart_flush(EX_UART_NUM);
     uart_write_bytes(EX_UART_NUM, message_publish_content_for_publish_mqtt_binary_keep_alive, strlen(message_publish_content_for_publish_mqtt_binary_keep_alive) + 1);
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-
-    find_error = strstr(message_response, "invalid command");
-    if (find_error != NULL)
-    {
-        u8Connect_fail++;
-        ESP_LOGE(TAG, "Fail %s", message_response);
-    }
-    find_error = strstr(message_response, "ERROR");
-    if (find_error != NULL)
-    {
-        u8Connect_fail++;
-        ESP_LOGE(TAG, "Fail %s", message_response);
-    }
+    mqtt_vCheck_error();
 
     free(message_json_keep_alive);
 }
@@ -405,7 +368,6 @@ static void mqtt_vPublish_task()
         if (u8Connect_fail >= BEE_COUNT_MAX_CONNECTED_FAIL)
         {
             ESP_LOGE(TAG, "Reload connect");
-            u8Connect_fail = 0;
 
             // confirm disconnect broker through led
             led_vSetLevel(LED_RED, HIGH_LEVEL);
@@ -413,6 +375,7 @@ static void mqtt_vPublish_task()
             led_vSetLevel(LED_BLUE, LOW_LEVEL);
 
             // reset status connect when retry connect broker
+            u8Connect_fail = 0;
             main_tain_connected = 0;
             led_vSetLevel(IO_POWER_ON, 0);
             vTaskDelay(pdMS_TO_TICKS(10000));
