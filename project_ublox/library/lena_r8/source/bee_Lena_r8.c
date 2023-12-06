@@ -9,7 +9,7 @@
 #include "driver/uart.h"
 #include "esp_system.h"
 #include "esp_mac.h"
-#include <stdio.h>
+// #include <stdio.h>
 #include <string.h>
 #include "esp_log.h"
 #include "cJSON.h"
@@ -25,12 +25,7 @@ QueueHandle_t queue_message_response; // queue for task subscribe
 extern bool check_data_flag;
 extern uint8_t trans_code;
 
-static bool flag_publish_task = 0;
-
 static const char *TAG = "LENA-R8";
-
-static TaskHandle_t xHandle_Publish = NULL;
-static TaskHandle_t xHandle_Subscribe = NULL;
 
 static char BEE_TOPIC_SUBSCRIBE[100];
 static char BEE_TOPIC_PUBLISH[100];
@@ -123,6 +118,7 @@ static void lena_vConnect_mqtt_broker()
 
     else if (strstr(message_response, "parameters are invalid") != NULL)
     {
+        vTaskDelay(pdMS_TO_TICKS(60000));
         esp_restart();
     }
 
@@ -132,8 +128,6 @@ static void lena_vConnect_mqtt_broker()
     // create AT command to subscribe topic on broker
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTTC=4,0,%s\r\n", BEE_TOPIC_SUBSCRIBE);
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-    // uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-    // printf("AT subscribe: %s\n", message_response);
     vTaskDelay(pdMS_TO_TICKS(2000));
 }
 
@@ -169,7 +163,6 @@ static void lena_vPublish_data_rs485()
     // Send content to publish
     uart_flush(EX_UART_NUM);
     uart_write_bytes(EX_UART_NUM, message_publish_content_for_publish_mqtt_binary_rs485, strlen(message_publish_content_for_publish_mqtt_binary_rs485) + 1);
-    // printf("%s\n", message_publish_content_for_publish_mqtt_binary_rs485);
     uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
     find_error = strstr(message_response, "invalid command");
     if (find_error != NULL)
@@ -352,7 +345,6 @@ void check_module_sim()
 
 static void mqtt_vPublish_task()
 {
-    flag_publish_task = 1;
     static TickType_t last_time_publish = 0;
     static TickType_t last_time_keep_alive = 0;
     static TickType_t last_time_blink_green_led = 0;
@@ -369,11 +361,7 @@ static void mqtt_vPublish_task()
                 led_vSetLevel(LED_BLUE, LOW_LEVEL);
                 last_time_blink_green_led = xTaskGetTickCount();
             }
-            else
-            {
-                // confirm disconnect broker through led
-                // TODO
-            }
+
             if (xTaskGetTickCount() - last_time_publish >= pdMS_TO_TICKS(BEE_TIME_PUBLISH_DATA_RS485))
             {
                 if (check_data_flag == 1) // new data
@@ -384,12 +372,12 @@ static void mqtt_vPublish_task()
                     led_vSetLevel(LED_GREEN, LOW_LEVEL);
                     led_vSetLevel(LED_BLUE, LOW_LEVEL);
 
-                    // u8Connect_fail++;
                     check_data_flag = 0; // reset data's status
                 }
                 last_time_publish = xTaskGetTickCount();
                 last_time_blink_green_led = xTaskGetTickCount();
             }
+
             if (xTaskGetTickCount() - last_time_keep_alive >= pdMS_TO_TICKS(BEE_TIME_PUBLISH_DATA_KEEP_ALIVE))
             {
                 lena_vPublish_keep_alive();
@@ -424,6 +412,7 @@ static void mqtt_vPublish_task()
             led_vSetLevel(LED_GREEN, LOW_LEVEL);
             led_vSetLevel(LED_BLUE, LOW_LEVEL);
 
+            // reset status connect when retry connect broker
             main_tain_connected = 0;
             led_vSetLevel(IO_POWER_ON, 0);
             vTaskDelay(pdMS_TO_TICKS(10000));
@@ -436,17 +425,7 @@ static void mqtt_vPublish_task()
             }
 
             lena_vConfigure_credential();
-
             lena_vConnect_mqtt_broker();
-
-            // // reset status connect when retry connect broker
-
-            // // vTaskDelete(xHandle_Subscribe);
-            // // vTaskDelete(xHandle_Publish);
-            // // config credential and connect broker
-            // lena_vConfigure_credential();
-            // lena_vConnect_mqtt_broker();
-            // last_time_retry_connect = xTaskGetTickCount();
         }
         vTaskDelay(pdMS_TO_TICKS(100));
     }
@@ -574,11 +553,9 @@ void mqtt_vLena_r8_start()
     lena_vConfigure_credential();
     while (main_tain_connected == 0)
         lena_vConnect_mqtt_broker();
-    if (flag_publish_task == 0)
-    {
-        xTaskCreate(mqtt_vPublish_task, "mqtt_vPublish_task", 1024 * 3, NULL, 3, &xHandle_Publish);
-        xTaskCreate(mqtt_vSubscribe_command_server_task, "mqtt_vSubscribe_command_server_task", 1024 * 3, NULL, 4, &xHandle_Subscribe);
-    }
+
+    xTaskCreate(mqtt_vPublish_task, "mqtt_vPublish_task", 1024 * 3, NULL, 3, NULL);
+    xTaskCreate(mqtt_vSubscribe_command_server_task, "mqtt_vSubscribe_command_server_task", 1024 * 3, NULL, 4, NULL);
 }
 /****************************************************************************/
 /***        END OF FILE                                                   ***/
