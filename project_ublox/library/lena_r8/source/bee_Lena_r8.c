@@ -116,16 +116,12 @@ static void lena_vConnect_mqtt_broker()
 
     else if (strstr(message_response, "parameters are invalid") != NULL)
     {
+        // reset Lena-R8
         led_vSetLevel(IO_POWER_ON, 0);
         led_vSetLevel(IO_RESET_LENA, 0);
         vTaskDelay(pdMS_TO_TICKS(60000));
-        esp_restart();
 
-        // snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTT?\r\n");
-        // uart_flush(EX_UART_NUM);
-        // uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
-        // uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
-        // ESP_LOGI(TAG, "After parameters error %s", message_response);
+        esp_restart();
     }
 
     ESP_LOGI(TAG, "AT connect: %s", message_response);
@@ -177,9 +173,6 @@ static void lena_vPublish_data_rs485()
     mqtt_vCheck_error();
 
     free(message_json_rs485);
-    snprintf(message_publish, BEE_LENGTH_AT_COMMAND, "AT+UMQTT=12,1\r\n");
-    uart_flush(EX_UART_NUM);
-    uart_write_bytes(EX_UART_NUM, message_publish, strlen(message_publish));
 }
 
 static char *cCreate_message_json_keep_alive()
@@ -529,7 +522,6 @@ void mqtt_vLena_r8_start()
 
     // config credential and connect broker
     lena_vConfigure_credential();
-    // while (main_tain_connected == 0)
     lena_vConnect_mqtt_broker();
 
     xTaskCreate(mqtt_vPublish_task, "mqtt_vPublish_task", 1024 * 3, NULL, 3, NULL);
