@@ -26,6 +26,7 @@ void led_vCreate_status()
     led_vCreate(LED_BLUE);
 
     led_vCreate(IO_POWER_ON);
+    led_vCreate(IO_RESET_LENA);
 }
 
 /****************************************************************************/

@@ -380,6 +380,8 @@ static void mqtt_vPublish_task()
             led_vSetLevel(IO_POWER_ON, 0);
             vTaskDelay(pdMS_TO_TICKS(10000));
             led_vSetLevel(IO_POWER_ON, 1);
+            led_vSetLevel(IO_RESET_LENA, 1);
+            vTaskDelay(pdMS_TO_TICKS(5000));
             reg = false;
 
             while (reg == false)
