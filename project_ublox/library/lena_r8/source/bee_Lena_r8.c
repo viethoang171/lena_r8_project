@@ -325,7 +325,7 @@ static void mqtt_vPublish_task()
         {
             if (xTaskGetTickCount() - last_time_blink_green_led >= pdMS_TO_TICKS(BEE_TIME_BLINK_GREEN_LED))
             {
-                // confirm disconnect broker through led
+                // blink led to perform publish data
                 led_vSetLevel(LED_RED, LOW_LEVEL);
                 led_vSetLevel(LED_GREEN, HIGH_LEVEL);
                 led_vSetLevel(LED_BLUE, LOW_LEVEL);
@@ -337,7 +337,8 @@ static void mqtt_vPublish_task()
                 if (check_data_flag == 1) // new data
                 {
                     lena_vPublish_data_rs485();
-                    // confirm disconnect broker through led
+
+                    // blink led to perform publish data
                     led_vSetLevel(LED_RED, LOW_LEVEL);
                     led_vSetLevel(LED_GREEN, LOW_LEVEL);
                     led_vSetLevel(LED_BLUE, LOW_LEVEL);
@@ -351,6 +352,7 @@ static void mqtt_vPublish_task()
             if (xTaskGetTickCount() - last_time_keep_alive >= pdMS_TO_TICKS(BEE_TIME_PUBLISH_DATA_KEEP_ALIVE))
             {
                 lena_vPublish_keep_alive();
+
                 // confirm disconnect broker through led
                 led_vSetLevel(LED_RED, LOW_LEVEL);
                 led_vSetLevel(LED_GREEN, LOW_LEVEL);
@@ -413,7 +415,7 @@ static void mqtt_vParse_json(char *mqtt_str)
         int Slave_addr = cJSON_GetObjectItemCaseSensitive(root, "slave_addr")->valueint;
         char *Cmd_type = cJSON_GetObjectItemCaseSensitive(root, "cmd_type")->valuestring;
 
-        // confirm disconnect broker through led
+        // blink led to confirm subscribe message json
         led_vSetLevel(LED_RED, LOW_LEVEL);
         led_vSetLevel(LED_GREEN, LOW_LEVEL);
         led_vSetLevel(LED_BLUE, LOW_LEVEL);
@@ -480,6 +482,7 @@ static void mqtt_vSubscribe_command_server_task()
                 // parse json
                 mqtt_vParse_json(message_json_subscribe);
 
+                // clean string
                 for (uint16_t u8Index = 0; u8Index < BEE_LENGTH_AT_COMMAND; u8Index++)
                 {
                     list_message_subscribe[u8Index] = '\0';
