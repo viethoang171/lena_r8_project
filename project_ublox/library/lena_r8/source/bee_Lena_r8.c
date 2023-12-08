@@ -92,7 +92,10 @@ static void lena_vConnect_mqtt_broker()
 
     // CGACT
     snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+CGACT=1,1\r\n");
+    uart_flush(EX_UART_NUM);
     uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+    uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+    ESP_LOGI(TAG, "Response CGACT: %s", message_response);
     vTaskDelay(pdMS_TO_TICKS(2000));
 
     // AT connect
@@ -113,8 +116,16 @@ static void lena_vConnect_mqtt_broker()
 
     else if (strstr(message_response, "parameters are invalid") != NULL)
     {
+        led_vSetLevel(IO_POWER_ON, 0);
+        led_vSetLevel(IO_RESET_LENA, 0);
         vTaskDelay(pdMS_TO_TICKS(60000));
         esp_restart();
+
+        // snprintf(command_AT, BEE_LENGTH_AT_COMMAND, "AT+UMQTT?\r\n");
+        // uart_flush(EX_UART_NUM);
+        // uart_write_bytes(EX_UART_NUM, command_AT, strlen(command_AT));
+        // uart_read_bytes(EX_UART_NUM, message_response, BEE_LENGTH_MESSAGE_RESPONSE, (TickType_t)TICK_TIME_TO_SUBSCRIBE_FULL_MESSAGE);
+        // ESP_LOGI(TAG, "After parameters error %s", message_response);
     }
 
     ESP_LOGI(TAG, "AT connect: %s", message_response);
@@ -166,6 +177,9 @@ static void lena_vPublish_data_rs485()
     mqtt_vCheck_error();
 
     free(message_json_rs485);
+    snprintf(message_publish, BEE_LENGTH_AT_COMMAND, "AT+UMQTT=12,1\r\n");
+    uart_flush(EX_UART_NUM);
+    uart_write_bytes(EX_UART_NUM, message_publish, strlen(message_publish));
 }
 
 static char *cCreate_message_json_keep_alive()
@@ -380,8 +394,7 @@ static void mqtt_vPublish_task()
             led_vSetLevel(IO_POWER_ON, 0);
             vTaskDelay(pdMS_TO_TICKS(10000));
             led_vSetLevel(IO_POWER_ON, 1);
-            led_vSetLevel(IO_RESET_LENA, 1);
-            vTaskDelay(pdMS_TO_TICKS(5000));
+
             reg = false;
 
             while (reg == false)
@@ -408,9 +421,9 @@ static void mqtt_vParse_json(char *mqtt_str)
         char *Cmd_type = cJSON_GetObjectItemCaseSensitive(root, "cmd_type")->valuestring;
 
         // confirm disconnect broker through led
-        led_vSetLevel(LED_RED, HIGH_LEVEL);
-        led_vSetLevel(LED_GREEN, HIGH_LEVEL);
-        led_vSetLevel(LED_BLUE, HIGH_LEVEL);
+        led_vSetLevel(LED_RED, LOW_LEVEL);
+        led_vSetLevel(LED_GREEN, LOW_LEVEL);
+        led_vSetLevel(LED_BLUE, LOW_LEVEL);
 
         if ((strcmp(Thing_token, mac_address) == 0) && (strcmp(Cmd_name, "Bee.Nag_cmd") == 0) && (strcmp(Object_type, "Bee.Nag_vrf") == 0))
         {
@@ -516,8 +529,8 @@ void mqtt_vLena_r8_start()
 
     // config credential and connect broker
     lena_vConfigure_credential();
-    while (main_tain_connected == 0)
-        lena_vConnect_mqtt_broker();
+    // while (main_tain_connected == 0)
+    lena_vConnect_mqtt_broker();
 
     xTaskCreate(mqtt_vPublish_task, "mqtt_vPublish_task", 1024 * 3, NULL, 3, NULL);
     xTaskCreate(mqtt_vSubscribe_command_server_task, "mqtt_vSubscribe_command_server_task", 1024 * 3, NULL, 4, NULL);
